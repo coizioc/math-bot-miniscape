@@ -1,0 +1,10 @@
+This file is to show the syntax for how to write a loottable for a particular monster. Each one is named after the monsterid, e.g. if the monsterid of a monster is 1, then the file would be named 1.txt. These files are placed in a subdirectory of ./resources/ called monsters. Below, between the ==='s is an example of one such file.
+
+=======EXAMPLE BELOW=======
+1;1;10;1
+26;1;53;16
+35;35;35;420
+592;18;392;15
+=======EXAMPLE ABOVE=======
+
+The file is essentially a semicolon-delimited list with four values: (1) itemid, (2) item minimum, (3) item maximum, (4) chance. If the item minimum and item maximum are the same, it will drop the same number of items per drop. Chance is the denominator of a 1/n drop.

@@ -46,8 +46,13 @@ RARITY_NAMES = {
     }
 
 
+def add_plural(monsterid):
+    return get_attr(monsterid) + 's'
+
+
 def find_by_name(name):
     """Finds a monster's ID from its name."""
+    name = name.lower()
     for monsterid in list(MONSTERS.keys()):
         if name == MONSTERS[monsterid][NAME_KEY]:
             return monsterid
@@ -82,7 +87,7 @@ def get_loot_table(monsterid):
     return loot_table
 
 
-def get_loot(monsterid, num_to_kill):
+def get_loot(monsterid, num_to_kill, factor=1):
     """Generates a Counter from a number of killed monsters given its id."""
     loot_table = get_loot_table(monsterid)
     max_rarity = get_max_rarity(loot_table)
@@ -92,7 +97,7 @@ def get_loot(monsterid, num_to_kill):
         if loot_table[key]['rarity'] == 1:
             loot.extend([key] * num_to_kill)
     for _ in range(int(num_to_kill)):
-        for _ in range(8):
+        for _ in range(round(8 * factor)):
             item = random.sample(loot_table.keys(), 1)[0]
             item_chance = loot_table[item]['rarity']
             if random.randint(1, item_chance) == 1 and int(item_chance) > 1:
@@ -110,6 +115,17 @@ def get_max_rarity(loot_table):
         rarity = loot_table[key]['rarity']
         max_rarity = rarity if rarity > max_rarity else max_rarity
     return max_rarity
+
+
+def get_rares(monster_name):
+    monsterid = find_by_name(monster_name)
+    loottable = get_loot_table(monsterid)
+
+    rares = []
+    for item in list(loottable.keys()):
+        if int(loottable[item]['rarity']) >= 1024:
+            rares.append(item)
+    return rares
 
 
 def get_task_length(monsterid):

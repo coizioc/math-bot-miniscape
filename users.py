@@ -19,16 +19,20 @@ with open(ARMOUR_SLOTS_FILE, 'r') as f:
         line_split = line.split(';')
         SLOTS[line_split[0]] = line_split[1]
 
-ITEMS_KEY = 'items'        # User's inventory, stored as a Counter
-EQUIPMENT_KEY = 'equip'    # User's equipment, stored as a list of size 13 initialized to -1.
-COMBAT_XP_KEY = 'combat'   # User's combat xp, stored as an int.
-SLAYER_XP_KEY = 'slayer'   # User's slayer xp, stored as an int.
-QUESTS_KEY = 'quests'      # User's complted quest. Storted as a hexidecimal number whose bits represent whether a user
-                           # has completed a quest with that questid.
+ITEMS_KEY = 'items'             # User's inventory, stored as a Counter
+EQUIPMENT_KEY = 'equip'         # User's equipment, stored as a list of size 13 initialized to -1.
+COMBAT_XP_KEY = 'combat'        # User's combat xp, stored as an int.
+SLAYER_XP_KEY = 'slayer'        # User's slayer xp, stored as an int.
+GATHER_XP_KEY = 'gather'        # User's gathering xp, stored as an int.
+ARTISAN_XP_KEY = 'artisan'      # User's artisan xp, stored as an int.
+QUESTS_KEY = 'quests'           # User's complted quest. Storted as a hexidecimal number whose bits represent
+                                # whether a user has completed a quest with that questid.
 DEFAULT_ACCOUNT = {ITEMS_KEY: Counter(),
                    EQUIPMENT_KEY: [-1]*13,
                    COMBAT_XP_KEY: 0,
                    SLAYER_XP_KEY: 0,
+                   GATHER_XP_KEY: 0,
+                   ARTISAN_XP_KEY: 0,
                    QUESTS_KEY: "0x0"}
 
 
@@ -137,9 +141,13 @@ def print_account(userid):
     """Writes a string showing basic user information."""
     combat_xp = read_user(userid, key=COMBAT_XP_KEY)
     slayer_xp = read_user(userid, key=SLAYER_XP_KEY)
+    gather_xp = read_user(userid, key=GATHER_XP_KEY)
+    artisan_xp = read_user(userid, key=ARTISAN_XP_KEY)
     out = f'__**:crossed_swords: CHARACTER :crossed_swords:**__\n'\
           f'**Combat Level**: {xp_to_level(combat_xp)} *({combat_xp} xp)*\n'\
-          f'**Slayer Level**: {xp_to_level(slayer_xp)} *({slayer_xp} xp)*\n\n'\
+          f'**Slayer Level**: {xp_to_level(slayer_xp)} *({slayer_xp} xp)*\n' \
+          f'**Gathering Level**: {xp_to_level(gather_xp)} *({gather_xp} xp)*\n' \
+          f'**Artisan Level**: {xp_to_level(artisan_xp)} *({artisan_xp} xp)*\n\n'
 
     out += print_equipment(userid)
 
@@ -177,9 +185,13 @@ def print_inventory(userid, search):
         if search != '':
             if search not in name.lower():
                 continue
-        value = '{:,}'.format(items.get_attr(itemid, key=items.VALUE_KEY))
+        value = items.get_attr(itemid, key=items.VALUE_KEY)
+        value_formatted = '{:,}'.format(value)
+        item_total_value = int(inventory[itemid]) * value
+        item_total_value_formatted = '{:,}'.format(item_total_value)
         if inventory[itemid] > 0:
-            out += f'**{items.get_attr(itemid).title()}**: {inventory[itemid]}. *(value: {value} each)*\n'
+            out += f'**{items.get_attr(itemid).title()}**: {inventory[itemid]}. ' \
+                   f'*(value: {item_total_value_formatted}, {value_formatted} ea.)*\n'
         if len(out) > 1800:
             messages.append(out)
             out = header
@@ -235,7 +247,7 @@ def update_user(userid, value, key=ITEMS_KEY):
         accounts[userid] = DEFAULT_ACCOUNT
     if key not in accounts[userid].keys():
         accounts[userid][key] = DEFAULT_ACCOUNT[key]
-    if key == COMBAT_XP_KEY or key == SLAYER_XP_KEY:
+    if key == COMBAT_XP_KEY or key == SLAYER_XP_KEY or key == GATHER_XP_KEY or key == ARTISAN_XP_KEY:
         current_xp = accounts[userid][key]
         accounts[userid][key] = current_xp + value
     elif key == EQUIPMENT_KEY or key == ITEMS_KEY:

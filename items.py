@@ -9,14 +9,19 @@ from subs.miniscape.files import ITEM_JSON, SHOP_FILE
 with open(ITEM_JSON, 'r') as f:
     ITEMS = ujson.load(f)
 
-NAME_KEY = 'name'
-VALUE_KEY = 'value'
-DAMAGE_KEY = 'damage'
-ACCURACY_KEY = 'accuracy'
-ARMOUR_KEY = 'armour'
-SLOT_KEY = 'slot'
-AFFINITY_KEY = 'aff'
-LEVEL_KEY = 'level'
+NAME_KEY = 'name'           # Name of the item
+VALUE_KEY = 'value'         # High alch value of the item
+DAMAGE_KEY = 'damage'       # Damage stat of the item
+ACCURACY_KEY = 'accuracy'   # Accuracy stat of the item
+ARMOUR_KEY = 'armour'       # Armuour stat of the item
+SLOT_KEY = 'slot'           # Slot item can be equipped
+AFFINITY_KEY = 'aff'        # Item affinity, 0:Melee, 1:Range, 2:Magic
+LEVEL_KEY = 'level'         # Level item can be equipped/gathered
+XP_KEY = 'xp'               # xp gained for gathering/crafting the item.
+GATHER_KEY = 'gather'       # Boolean whether item can be gathered.
+TREE_KEY = 'tree'           # Boolean whether gatherable is a tree.
+ROCK_KEY = 'rock'           # Boolean whether gatherable is a rock.
+FISH_KEY = 'fish'           # Boolean whether gatherable is a fish.
 DEFAULT_ITEM = {NAME_KEY: 'unknown item',
                 VALUE_KEY: 0,
                 DAMAGE_KEY: 0,
@@ -24,7 +29,9 @@ DEFAULT_ITEM = {NAME_KEY: 'unknown item',
                 ARMOUR_KEY: 0,
                 SLOT_KEY: 0,
                 AFFINITY_KEY: 0,
-                LEVEL_KEY: 1}
+                LEVEL_KEY: 1,
+                XP_KEY: 1,
+                GATHER_KEY: False}
 
 SLOT_NAMES = {
         "0": "None",
@@ -44,6 +51,10 @@ SLOT_NAMES = {
     }
 
 
+def add_plural(itemid):
+    return get_attr(itemid) + 's'
+
+
 def buy(userid, item, number):
     """Buys (a given amount) of an item and places it in the user's inventory."""
     try:
@@ -57,7 +68,7 @@ def buy(userid, item, number):
     item_name = get_attr(itemid)
     if item_in_shop(itemid):
         items = open_shop()
-        if int(items[itemid]) in users.get_completed_quests(userid):
+        if int(items[itemid]) in users.get_completed_quests(userid) or int(items[itemid]) == 0:
             value = get_attr(itemid, key=VALUE_KEY)
             users.update_inventory(userid, [itemid]*number)
             ac.update_account(userid, -(4 * number * value))

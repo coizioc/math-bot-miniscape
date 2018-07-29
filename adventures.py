@@ -2,6 +2,7 @@ import datetime
 import math
 import random
 
+from subs.miniscape import quests, slayer, craft
 from subs.miniscape.files import ADVENTURES_FILE
 
 # An adventure in the adventure file is stored as the following (with semicolon delimiters in between):
@@ -28,6 +29,15 @@ def add_finish_time(userid, time):
 def format_line(*args):
     args_str = [str(arg) for arg in args]
     return ';'.join(args_str) + '\n'
+
+
+def get_adventure(userid):
+    lines = get_list()
+    for line in lines:
+        if str(userid) in line:
+            return line.split(';')
+    else:
+        raise NameError
 
 
 def get_delta(finish_time):
@@ -91,10 +101,30 @@ def is_success(chance):
         return False
 
 
+def print_adventure(userid):
+    lines = get_list()
+
+    for line in lines:
+        if str(userid) in line:
+            adventure = line.split(';')
+            break
+    else:
+        raise KeyError
+    adventureid, userid, finish_time = adventure[0:3]
+    adventures = {
+        '0': slayer.print_status,
+        '1': slayer.print_kill_status,
+        '2': quests.print_status,
+        '3': craft.print_status
+    }
+    time_left = get_delta(finish_time)
+    out = adventures[adventureid](time_left, adventure[3:])
+    return out
+
+
 def print_on_adventure_error(adventure):
     """Prints a string saying that the user cannot do two adventures at once."""
-    out = f'You are currently in the middle of doing something else. ' \
-          f'Please finish that first before starting a new {adventure}.'
+    out = f'Please finish that first before starting a new {adventure}.'
     return out
 
 

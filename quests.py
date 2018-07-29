@@ -126,10 +126,9 @@ def get_result(person, *args):
 
     out = f'{QUEST_HEADER}**{person.mention}, here is the result of your quest, {get_attr(questid)}**:\n'
     if adv.is_success(calc_chance(person.id, questid)):
-        out += f'*{get_attr(questid, key=SUCCESS_KEY)}*\n\n' \
-               f'**Reward**:\n'
-
+        out += f'*{get_attr(questid, key=SUCCESS_KEY)}*\n\n'
         reward = get_attr(questid, key=REWARD_KEY)
+        out += f'**Reward**:\n'
         loot = []
         for itemid in reward:
             loot.extend(reward[itemid] * [itemid])
@@ -154,6 +153,9 @@ def print_details(userid, questid):
     out += f'*{get_attr(questid, key=DESCRIPTION_KEY)}*\n\n'
 
     out += f'**Base Time**: {get_attr(questid, key=TIME_KEY)} minutes.\n'
+
+    if int(questid) in users.get_completed_quests(userid):
+        out += f'\n*{get_attr(questid, key=SUCCESS_KEY)}*\n'
 
     quest_reqs = get_attr(questid, key=QUEST_REQ_KEY)
     if len(quest_reqs) > 0:
@@ -195,7 +197,15 @@ def print_list(userid):
 def print_quest(questid, time, chance):
     """Prints the quest information into a string."""
     out = f"You are now doing the quest {get_attr(questid)}. This will take {math.floor(time / 60)} minutes " \
-          f"and has a {chance}% chance of succeeding with your current gear."
+          f"and has a {chance}% chance of succeeding with your current gear. "
+    return out
+
+
+def print_status(time_left, *args):
+    questid, chance = args[0]
+    out = f'{QUEST_HEADER}' \
+          f'You are already on the quest {get_attr(questid)}. You can see the results of this quest in '\
+          f'{time_left} minutes. You currently have a {chance}% of succeeding with your current gear. '
     return out
 
 
@@ -227,19 +237,6 @@ def start_quest(userid, questid):
         else:
             return "Error: you have not completed the required quests to do this quest."
     else:
-        task = adv.read(userid)
-        adventure_id = int(task[0])
-
-        if adventure_id == 2:
-            userid, finish_time, questid, chance = task[1:]
-
-            try:
-                time_left = 'in ' + str(adv.get_delta(finish_time)) + ' minutes'
-            except ValueError:
-                time_left = 'at an indeterminate time'
-            chance = calc_chance(userid, questid)
-            out += f'You are already on the quest {get_attr(questid)}. You can see the results of this quest ' \
-                   f'{time_left}. You currently have a {chance}% of succeeding with your current gear.'
-        else:
-            out += adv.print_on_adventure_error('quest')
+        out = adv.print_adventure(userid)
+        out += adv.print_on_adventure_error('quest')
     return out

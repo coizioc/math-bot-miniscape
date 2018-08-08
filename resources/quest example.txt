@@ -1,0 +1,81 @@
+This file is to show the syntax for how to write a quest. The quest file is a json file.
+
+=======EXAMPLE BELOW=======
+{
+  "1"{
+    "name": "Cook's Assistant",
+    "description": "The Head Chef of Lumbridge Castle needs your assistance in creating an amazing meal for the Duke. Are you up to the culinary task?",
+    "success": "The cook now has everything he needs to serve the best meal to the Duke! As a thanks, he has given you a small cash reward, as well as a seat to the next Lumbridge Feast!",
+    "item req": {
+      "250": 1,
+      "251": 1,
+      "252": 1
+    },
+    "reward": { 
+      "0": 300
+    },
+    "time": 1
+  },
+  "2"{
+    "name": "Dragon Slayer, Part 3",
+    "description": "With your anti-dragon shield in hand and the map in pocket, all that stands between you and membership in the Champions' Guild is the head of Elvarg. Good luck.",
+    "success": "After some artful dodging of claws, scales, and fireballs, you strike a deadly blow to Elvarg, finally ridding the world of her evils! You take her head back to the Champions' Guild, which is now proudly on display as the trophy of their newest and most promising recruit. As a welcome gift, they give you a piece of rare and strong runite armour!",
+    "failure": "Elvarg proves to be more of a challenge than expected, but you get out before she is able to send a final blow your way. Now that you've recuperated, you feel that you are now ready to defeat Elvarg.",
+    "quest req": [
+      7,
+      8,
+      9
+    ],
+    "reward": {
+      "120": 1
+    },
+    "damage": 70,
+    "accuracy": 70,
+    "armour": 70,
+    "level": 83,
+    "dragon": true,
+    "time": 20
+  }
+}
+=======EXAMPLE ABOVE=======
+
+Below is a full list of tags, as well as their default values and an explanation:
+
+"name": 'Untitled Quest'
+This is the title of your quest.
+
+"description": 'Go something for this person and get some stuff in return.'
+This is the extended description of the quest.
+
+"success": 'You did it!'
+This is the message given when the user succeeds in their quest.
+
+"failure": "You didn't do it!"
+This is the message give when the user does not succeed in their quest.
+
+"item req": Counter()
+These are the items required to start a quest. They will be consumed upon each attempt. This is stored as a Counter object in python.
+
+"quest req": []
+These are the quests required to start a quest.
+
+"reward": Counter()
+These are the items given if the quest is successfully completed. This is stored as a Counter object in python.
+
+"damage": 1
+This is the damage stat of the monster in the quest.
+
+"accuracy": 1
+This is the accuracy stat of the monster in the quest.
+
+"armour": 1
+This is the armour stat of the monster in the quest.
+
+"level": 1
+This is the level of the monster in the quest.
+
+"dragon": false
+This tells whether the monster in the quest is a dragon or not.
+
+"time": 10
+This is the base time needed to complete the quest. The actual time required may vary from 0.5x the base time to 2x the base time.

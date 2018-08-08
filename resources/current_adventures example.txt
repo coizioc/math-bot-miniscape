@@ -1,0 +1,23 @@
+This file shows the syntax of the current_adventures.txt, which stores the current adventures users are on. This should not need to be messed with while the bot is running.
+
+=======EXAMPLE BELOW=======
+1;293219550637824;2018-08-03 07:54:22.182221;60;kree'arra;500;269
+1;297359255956234;2018-08-03 08:16:55.687268;60;kree'arra;500;221
+1;108682524060928;2018-08-03 06:57:49.119483;64;tzhaar;500;54
+1;114514395173808;2018-08-03 09:11:45.383871;63;general graardor;500;187
+1;236842111832672;2018-08-03 08:38:28.094921;1;abyssal demon;500;146
+1;116380350296914;2018-08-03 07:23:21.094613;63;general graardor;82;30
+=======EXAMPLE ABOVE=======
+
+As can be seen above, the file is essentially a semicolon-delimted list containing the following parameters:
+
+1) the adventure's id.
+2) the user's id.
+3) the datetime string when the adventure will finish.
+
+All adventures share these parameters. The parameters after these are specific to each adventure. For example, for the "kill" adventure, the parameters are as follows:
+
+4) the monster's id.
+5) name of the monster.
+6) number of the monsters to kill.
+7) length of killing session (in minutes).

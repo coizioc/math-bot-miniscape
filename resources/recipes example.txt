@@ -1,0 +1,45 @@
+This file is to show the syntax for how to write a recipe. The recipes file is a json file.
+
+=======EXAMPLE BELOW========
+{
+  "118":{
+    "level req": 58,
+    "inputs": {
+      "62": 3
+    }
+  },
+  "119":{
+    "level req": 59,
+    "inputs": {
+      "62": 4
+    }
+  },
+  "120":{
+    "level req": 60,
+    "inputs": {
+      "62": 5
+    }
+  },
+  "220":{
+    "level req": 70,
+    "quest req": [11],
+    "inputs": {
+      "226": 1,
+      "227": 1,
+      "228": 1,
+      "267": 1
+    }
+  }
+}
+=======EXAMPLE ABOVE=======
+
+Below is a full list of tags, as well as their default values and an explanation:
+
+"level req": 1
+This is the artisan level required to craft an item.
+
+"quest req": []
+These are the quests required to craft a recipe.
+
+"inputs": Counter()
+These are the items required to make an item.

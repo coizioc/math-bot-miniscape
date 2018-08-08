@@ -1,11 +1,8 @@
 import ujson
 from collections import Counter
 
-from subs.gastercoin import account as ac
-
-from subs.miniscape.files import USERS_JSON, XP_FILE, ARMOUR_SLOTS_FILE
 from subs.miniscape import items
-
+from subs.miniscape.files import USERS_JSON, XP_FILE, ARMOUR_SLOTS_FILE
 
 XP = {}
 with open(XP_FILE, 'r') as f:
@@ -19,7 +16,9 @@ with open(ARMOUR_SLOTS_FILE, 'r') as f:
         line_split = line.split(';')
         SLOTS[line_split[0]] = line_split[1]
 
-ITEMS_KEY = 'items'             # User's inventory, stored as a Counter
+ITEMS_KEY = 'items'             # User's inventory, stored as a Counter.
+MONSTERS_KEY = 'monsters'       # Count of monsters user has killed, stored as a Counter.
+CLUES_KEY = 'clues'             # Count of clues user has completed, stored as a Counter.
 EQUIPMENT_KEY = 'equip'         # User's equipment, stored as a list of size 13 initialized to -1.
 COMBAT_XP_KEY = 'combat'        # User's combat xp, stored as an int.
 SLAYER_XP_KEY = 'slayer'        # User's slayer xp, stored as an int.
@@ -28,12 +27,32 @@ ARTISAN_XP_KEY = 'artisan'      # User's artisan xp, stored as an int.
 QUESTS_KEY = 'quests'           # User's complted quest. Storted as a hexidecimal number whose bits represent
                                 # whether a user has completed a quest with that questid.
 DEFAULT_ACCOUNT = {ITEMS_KEY: Counter(),
-                   EQUIPMENT_KEY: [-1]*13,
+                   MONSTERS_KEY: Counter(),
+                   CLUES_KEY: Counter(),
+                   EQUIPMENT_KEY: [-1]*15,
                    COMBAT_XP_KEY: 0,
                    SLAYER_XP_KEY: 0,
                    GATHER_XP_KEY: 0,
                    ARTISAN_XP_KEY: 0,
                    QUESTS_KEY: "0x0"}
+
+CHARACTER_HEADER = f'__**:crossed_swords: CHARACTER :crossed_swords:**__\n'
+
+
+def add_counter(userid, value, number, key=MONSTERS_KEY):
+    """Adds a Counter to another Counter in a user's account."""
+    new_counts = Counter({value: int(number)})
+    with open(USERS_JSON, 'r') as f:
+        accounts = ujson.load(f)
+    userid = str(userid)
+    try:
+        monster_kills = Counter(accounts[userid][key])
+        monster_kills = monster_kills + new_counts
+        accounts[userid][key] = monster_kills
+    except KeyError:
+        accounts[userid][key] = new_counts
+    with open(USERS_JSON, 'w') as f:
+        ujson.dump(accounts, f)
 
 
 def clear_inventory(userid, under=None):
@@ -129,7 +148,7 @@ def item_in_inventory(userid, item, number=1):
 
     try:
         count = accounts[userid][ITEMS_KEY][item]
-        if count >= number:
+        if int(count) >= int(number):
             return True
         else:
             return False
@@ -143,7 +162,7 @@ def print_account(userid):
     slayer_xp = read_user(userid, key=SLAYER_XP_KEY)
     gather_xp = read_user(userid, key=GATHER_XP_KEY)
     artisan_xp = read_user(userid, key=ARTISAN_XP_KEY)
-    out = f'__**:crossed_swords: CHARACTER :crossed_swords:**__\n'\
+    out = f'{CHARACTER_HEADER}'\
           f'**Combat Level**: {xp_to_level(combat_xp)} *({combat_xp} xp)*\n'\
           f'**Slayer Level**: {xp_to_level(slayer_xp)} *({slayer_xp} xp)*\n' \
           f'**Gathering Level**: {xp_to_level(gather_xp)} *({gather_xp} xp)*\n' \
@@ -174,10 +193,10 @@ def print_equipment(userid):
     return out
 
 
-def print_inventory(userid, search):
+def print_inventory(person, search):
     """Prints a list of a user's inventory into discord message-sized chunks."""
-    inventory = read_user(userid)
-    header = ':moneybag: __**INVENTORY**__ :moneybag:\n'
+    inventory = read_user(person.id)
+    header = f":moneybag: __**{person.name.upper()}'S INVENTORY**__ :moneybag:\n"
     messages = []
     out = header
     for itemid in list(inventory.keys()):
@@ -196,7 +215,7 @@ def print_inventory(userid, search):
             messages.append(out)
             out = header
     total_value = '{:,}'.format(get_value_of_inventory(inventory))
-    out += f'*Total value: {total_value}*'
+    out += f'*Total value: {total_value}*\n'
     messages.append(out)
     return messages
 

@@ -1,31 +1,35 @@
 import math
 
-from subs.miniscape import users
-from subs.miniscape import items
 from subs.miniscape import adventures as adv
+from subs.miniscape import items
 from subs.miniscape import monsters as mon
+from subs.miniscape import users
 
 SLAYER_HEADER = ':skull_crossbones: __**SLAYER**__ :skull_crossbones:\n'
 
 
-def calc_chance(userid, monsterid, monster_stats=None):
+def calc_chance(userid, monsterid, number):
     """Calculates the chance of success of a task."""
+
     equipment = users.read_user(userid, key=users.EQUIPMENT_KEY)
     player_arm = users.get_equipment_stats(equipment)[2]
     monster_acc = mon.get_attr(monsterid, key=mon.ACCURACY_KEY)
     monster_dam = mon.get_attr(monsterid, key=mon.DAMAGE_KEY)
     monster_combat = mon.get_attr(monsterid, key=mon.LEVEL_KEY)
     player_combat = users.xp_to_level(users.read_user(userid, key=users.SLAYER_XP_KEY))
-    if mon.get_attr(monsterid, key=mon.DRAGON_KEY) and '266' not in equipment:
-        monster_base = 100
+    number = int(number)
+    if mon.get_attr(monsterid, key=mon.DRAGON_KEY):
+        if equipment[7] == '266' or equipment[7] == '293':
+            monster_base = 1
+        else:
+            monster_base = 100
     else:
         monster_base = 1
 
     c = 1 + monster_combat / 200
-    d = player_combat / 200
+    d = 1 + player_combat / 99
     dam_multiplier = monster_base + monster_acc / 200
-
-    chance = round(min(100 * max(0, (player_arm / (monster_dam * dam_multiplier + c)) / 2 + d), 100))
+    chance = round(min(100 * max(0, (2 * d * player_arm) / (number / 20 * monster_dam * dam_multiplier + c)), 100))
     return chance
 
 
@@ -36,15 +40,18 @@ def calc_length(userid, monsterid, number):
     player_dam, player_acc, player_arm = users.get_equipment_stats(equipment)
     monster_arm = mon.get_attr(monsterid, key=mon.ARMOUR_KEY)
     monster_xp = mon.get_attr(monsterid, key=mon.XP_KEY)
-    if mon.get_attr(monsterid, key=mon.DRAGON_KEY) and '266' not in equipment:
-        monster_base = 100
+    if mon.get_attr(monsterid, key=mon.DRAGON_KEY) == 1:
+        if equipment[7] == '266' or equipment[7] == '293':
+            monster_base = 1
+        else:
+            monster_base = 100
     else:
         monster_base = 1
 
     c = combat_level
     dam_multiplier = 1 + player_acc / 200
     base_time = math.floor(number * monster_xp / 10)
-    time = round(base_time * (monster_arm * monster_base / (player_dam * dam_multiplier + c)))
+    time = round(base_time * monster_arm * monster_base / (player_dam * dam_multiplier + c))
     return base_time, time
 
 
@@ -79,6 +86,12 @@ def get_kill(userid, monster, length=-1, number=-1):
             return f'Error: {monster} is not a monster.'
         except ValueError:
             return f'Error: {length} is not a valid length of time.'
+
+        completed_quests = users.get_completed_quests(userid)
+        quest_req = mon.get_attr(monsterid, key=mon.QUEST_REQ_KEY)
+        if not {quest_req}.issubset(completed_quests) and quest_req != 0:
+            return f'Error: you do not have the required quests to kill this monster.'
+
         monster_name = mon.get_attr(monsterid)
         slayer_level = users.xp_to_level(users.read_user(userid, key=users.SLAYER_XP_KEY))
         slayer_requirement = mon.get_attr(monsterid, key=mon.SLAYER_REQ_KEY)
@@ -92,7 +105,7 @@ def get_kill(userid, monster, length=-1, number=-1):
             length = 180
 
         if int(number) < 0:
-            number = calc_number(userid, monsterid, length * 60)
+            number = calc_number(userid, monsterid, (length + 1) * 60) - 1
             if number > 500:
                 number = 500
         elif int(length) < 0:
@@ -115,7 +128,9 @@ def get_kill_result(person, *args):
     except ValueError as e:
         print(e)
         raise ValueError
+
     out = ''
+    users.add_counter(person.id, monsterid, num_to_kill)
     if mon.get_attr(monsterid, key=mon.SLAYER_KEY):
         factor = 0.75
     else:
@@ -124,40 +139,73 @@ def get_kill_result(person, *args):
     users.update_inventory(person.id, loot)
     out += print_loot(loot, person, monster_name, num_to_kill)
     xp_gained = mon.get_attr(monsterid, key=mon.XP_KEY) * int(num_to_kill)
+    cb_level_before = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
     users.update_user(person.id, xp_gained, users.COMBAT_XP_KEY)
+    cb_level_after = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
     combat_xp_formatted = '{:,}'.format(xp_gained)
-    out += f'\nYou have also gained {combat_xp_formatted} combat xp.'
+    out += f'\nYou have also gained {combat_xp_formatted} combat xp'
+    if cb_level_after > cb_level_before:
+        out += f' and {cb_level_after - cb_level_before} combat levels'
+    out += '.'
     return out
 
 
 def get_result(person, *args):
     """Determines the success and loot of a slayer task."""
+
     try:
         monsterid, monster_name, num_to_kill, chance = args[0]
     except ValueError as e:
         print(e)
         raise ValueError
     out = ''
-    if adv.is_success(calc_chance(person.id, monsterid)):
+    users.add_counter(person.id, monsterid, num_to_kill)
+
+    if adv.is_success(calc_chance(person.id, monsterid, num_to_kill)):
+
         loot = mon.get_loot(monsterid, int(num_to_kill))
         users.update_inventory(person.id, loot)
         out += print_loot(loot, person, monster_name, num_to_kill)
 
         xp_gained = mon.get_attr(monsterid, key=mon.XP_KEY) * int(num_to_kill)
+        cb_level_before = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
+        slay_level_before = users.xp_to_level(users.read_user(person.id, users.SLAYER_XP_KEY))
         users.update_user(person.id, xp_gained, users.SLAYER_XP_KEY)
         users.update_user(person.id, round(0.7 * xp_gained), users.COMBAT_XP_KEY)
+        cb_level_after = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
+        slay_level_after = users.xp_to_level(users.read_user(person.id, users.SLAYER_XP_KEY))
 
         slayer_xp_formatted = '{:,}'.format(xp_gained)
         combat_xp_formatted = '{:,}'.format(round(0.7 * xp_gained))
-        out += f'\nYou have also gained {slayer_xp_formatted} slayer xp and {combat_xp_formatted} combat xp.'
+        out += f'\nYou have also gained {slayer_xp_formatted} slayer xp and {combat_xp_formatted} combat xp. '
+        if cb_level_after > cb_level_before:
+            out += f'In addition, you have gained {cb_level_after - cb_level_before} combat levels. '
+        if slay_level_after > slay_level_before:
+            out += f'Also, as well, you have gained {slay_level_after - slay_level_before} slayer levels. '
+
     else:
-        xp_gained = round(mon.get_attr(monsterid, key=mon.XP_KEY) * int(num_to_kill) / 4)
+
+        factor = int(chance)/100
+        loot = mon.get_loot(monsterid, int(num_to_kill), factor=factor)
+        users.update_inventory(person.id, loot)
+        out += print_loot(loot, person, monster_name, num_to_kill)
+
+        xp_gained = round(mon.get_attr(monsterid, key=mon.XP_KEY) * int(num_to_kill) * factor)
+        cb_level_before = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
+        slay_level_before = users.xp_to_level(users.read_user(person.id, users.SLAYER_XP_KEY))
         users.update_user(person.id, xp_gained, users.SLAYER_XP_KEY)
         users.update_user(person.id, round(0.7 * xp_gained), users.COMBAT_XP_KEY)
+        cb_level_after = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
+        slay_level_after = users.xp_to_level(users.read_user(person.id, users.SLAYER_XP_KEY))
+
         slayer_xp_formatted = '{:,}'.format(xp_gained)
         combat_xp_formatted = '{:,}'.format(round(0.7 * xp_gained))
-        out += f'{person.mention}, your slayer task of {num_to_kill} {mon.add_plural(monsterid)} has failed.\n'\
-               f'You have received {slayer_xp_formatted} slayer xp and {combat_xp_formatted} combat xp.'
+        out += f'\nYou have received lower loot and experience because you have died.'\
+               f'\nYou have received {slayer_xp_formatted} slayer xp and {combat_xp_formatted} combat xp.'
+        if cb_level_after > cb_level_before:
+            out += f'In addition, you have gained {cb_level_after - cb_level_before} combat levels. '
+        if slay_level_after > slay_level_before:
+            out += f'Also, as well, you have gained {slay_level_after - slay_level_before} slayer levels. '
     return out
 
 
@@ -176,16 +224,19 @@ def get_task(userid):
     out = SLAYER_HEADER
     if not adv.is_on_adventure(userid):
         user_level = users.xp_to_level(users.read_user(userid, key=users.COMBAT_XP_KEY))
+        completed_quests = set(users.get_completed_quests(userid))
         equipment = users.read_user(userid, key=users.EQUIPMENT_KEY)
         for _ in range(1000):
             monsterid = mon.get_random(slayer_level=users.xp_to_level(users.read_user(userid, key=users.SLAYER_XP_KEY)))
             num_to_kill = mon.get_task_length(monsterid)
             base_time, task_length = calc_length(userid, monsterid, num_to_kill)
-            chance = calc_chance(userid, monsterid)
+            chance = calc_chance(userid, monsterid, num_to_kill)
             mon_level = mon.get_attr(monsterid, key=mon.LEVEL_KEY)
             # print(f'{monsterid} {task_length/base_time} {chance}')
-            if 0.5 <= task_length / base_time <= 2 and chance >= 20 and mon_level / user_level >= 0.9\
-                    and mon.get_attr(monsterid, key=mon.SLAYER_KEY) is True:
+            if 0.25 <= task_length / base_time <= 2 and chance >= 20 and mon_level / user_level >= 0.8\
+                    and mon.get_attr(monsterid, key=mon.SLAYER_KEY) is True\
+                    and ({mon.get_attr(monsterid, key=mon.QUEST_REQ_KEY)}.issubset(completed_quests)
+                    or mon.get_attr(monsterid, key=mon.QUEST_REQ_KEY) == 0):
                 break
         else:
             return "Error: gear too low to fight any monsters. Please equip some better gear and try again. " \
@@ -239,8 +290,11 @@ def print_chance(userid, monsterid, monster_dam=-1, monster_acc=-1, monster_arm=
     else:
         monster_base = 1
 
+    c = 1 + monster_combat / 200
+    d = 1 + player_combat / 99
     dam_multiplier = monster_base + monster_acc / 200
-    chance = round(min(100 * max(0, (player_arm / (monster_dam * dam_multiplier + 1 + monster_combat / 200)) / 2 + player_combat / 200), 100))
+    chance = round(min(100 * max(0, (2 * d * player_arm) / (number / 20 * monster_dam * dam_multiplier + c)), 100))
+    # chance = round(min(100 * max(0, (player_arm / (monster_dam * dam_multiplier + 1 + monster_combat / 200)) / 2 + player_combat / 200), 100))
 
     dam_multiplier = 1 + player_acc / 200
     base_time = math.floor(number * xp / 10)
@@ -254,7 +308,7 @@ def print_kill_status(time_left, *args):
     monsterid, monster_name, number, length = args[0]
     out = f'{SLAYER_HEADER}' \
           f'You are currently killing {number} {mon.add_plural(monsterid)} for {length} minutes. ' \
-          f'You can see your loot in {time_left} minutes. '
+          f'You can see your loot {time_left}.'
     return out
 
 
@@ -262,8 +316,8 @@ def print_status(time_left, *args):
     monsterid, monster_name, num_to_kill, chance = args[0]
     out = f'{SLAYER_HEADER}' \
           f'You are currently slaying {num_to_kill} {mon.add_plural(monsterid)}. ' \
-          f'You can see the results of this slayer task in ' \
-          f'{time_left} minutes. You currently have a {chance}% chance of succeeding with your current gear. '
+          f'You can see the results of this slayer task {time_left}. ' \
+          f'You currently have a {chance}% chance of succeeding with your current gear. '
     return out
 
 

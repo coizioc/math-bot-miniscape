@@ -2,7 +2,7 @@ import datetime
 import math
 import random
 
-from subs.miniscape import quests, slayer, craft
+from subs.miniscape import quests, slayer, craft, clues
 from subs.miniscape.files import ADVENTURES_FILE
 
 # An adventure in the adventure file is stored as the following (with semicolon delimiters in between):
@@ -115,10 +115,17 @@ def print_adventure(userid):
         '0': slayer.print_status,
         '1': slayer.print_kill_status,
         '2': quests.print_status,
-        '3': craft.print_status
+        '3': craft.print_status,
+        '4': clues.print_status
     }
     time_left = get_delta(finish_time)
-    out = adventures[adventureid](time_left, adventure[3:])
+    if time_left == 1:
+        time_string = 'in 1 minute'
+    elif time_left < 1:
+        time_string = '   soon'
+    else:
+        time_string = f'in {time_left} minutes'
+    out = adventures[adventureid](time_string, adventure[3:])
     return out
 
 

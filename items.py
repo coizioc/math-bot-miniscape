@@ -1,12 +1,13 @@
 """This module contains methods that handle items and their attributes."""
 import ujson
 
-from subs.miniscape import users
 from subs.gastercoin import account as ac
 from subs.miniscape import monsters as mon
+from subs.miniscape import clues
+from subs.miniscape import users
 from subs.miniscape.files import ITEM_JSON, SHOP_FILE
 
-with open(ITEM_JSON, 'r') as f:
+with open(ITEM_JSON, 'r', encoding='utf-8-sig') as f:
     ITEMS = ujson.load(f)
 
 NAME_KEY = 'name'           # Name of the item
@@ -18,6 +19,7 @@ SLOT_KEY = 'slot'           # Slot item can be equipped
 AFFINITY_KEY = 'aff'        # Item affinity, 0:Melee, 1:Range, 2:Magic
 LEVEL_KEY = 'level'         # Level item can be equipped/gathered
 XP_KEY = 'xp'               # xp gained for gathering/crafting the item.
+QUEST_KEY = 'quest req'     # quest required to gather an item.
 GATHER_KEY = 'gather'       # Boolean whether item can be gathered.
 TREE_KEY = 'tree'           # Boolean whether gatherable is a tree.
 ROCK_KEY = 'rock'           # Boolean whether gatherable is a rock.
@@ -31,24 +33,14 @@ DEFAULT_ITEM = {NAME_KEY: 'unknown item',
                 AFFINITY_KEY: 0,
                 LEVEL_KEY: 1,
                 XP_KEY: 1,
-                GATHER_KEY: False}
+                QUEST_KEY: 0,
+                GATHER_KEY: False,
+                TREE_KEY: False,
+                ROCK_KEY: False,
+                FISH_KEY: False
+                }
 
-SLOT_NAMES = {
-        "0": "None",
-        "1": "Head",
-        "2": "Back",
-        "3": "Neck",
-        "4": "Ammunition",
-        "5": "Main-Hand",
-        "6": "Torso",
-        "7": "Off-Hand",
-        "8": "Legs",
-        "9": "Hands",
-        "10": "Feet",
-        "11": "Ring",
-        "12": "Pocket",
-        "13": "Aura"
-    }
+SHOP_HEADER = '__**:moneybag: SHOP :moneybag:**__\n'
 
 
 def add_plural(itemid):
@@ -79,6 +71,12 @@ def buy(userid, item, number):
     else:
         return f'Error: {item_name} not in inventory or you do not have at least {number} in your inventory.'
 
+
+def claim(itemname):
+    try:
+        itemid = find_by_name(itemname)
+    except ValueError:
+        return f"Error: {itemname} is not an item."
 
 def compare(item1, item2):
     """Prints a string comparing the stats of two given items."""
@@ -129,6 +127,12 @@ def get_attr(itemid, key=NAME_KEY):
         raise KeyError
 
 
+def is_tradable(itemid):
+    if get_attr(itemid, key=VALUE_KEY) < 1 or itemid in {'384', '267', '291'}:
+        return False
+    return True
+
+
 def item_in_shop(itemid):
     """Checks if an item is in the shop."""
     return str(itemid) in set(open_shop().keys())
@@ -170,9 +174,8 @@ def print_shop(userid):
     """Prints the shop."""
     items = open_shop()
 
-    header = '__**:moneybag: SHOP :moneybag:**__\n'
+    out = SHOP_HEADER
     messages = []
-    out = f'{header}'
     for itemid in list(items.keys()):
         if int(items[itemid]) in set(users.get_completed_quests(userid)) or items[itemid] == '0':
             name = get_attr(itemid)
@@ -180,7 +183,7 @@ def print_shop(userid):
             out += f'**{name.title()}**: G${price}\n'
         if len(out) > 1800:
             messages.append(out)
-            out = f'{header}'
+            out = SHOP_HEADER
     messages.append(out)
     return messages
 
@@ -211,4 +214,5 @@ def print_stats(item):
         out += f'**Level Requirement**: {level}\n'
 
     out += "\n" + mon.print_item_from_lootable(itemid)
+    out += clues.print_item_from_lootable(itemid)
     return out

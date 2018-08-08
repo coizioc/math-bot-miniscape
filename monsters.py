@@ -1,8 +1,8 @@
-from collections import Counter
-import ujson
 import random
+import ujson
+from collections import Counter
 
-from subs.miniscape import items
+from subs.miniscape import items, users
 from subs.miniscape.files import MONSTERS_JSON, MONSTER_DIRECTORY
 
 with open(MONSTERS_JSON, 'r') as f:
@@ -20,6 +20,7 @@ DAMAGE_KEY = 'damage'           # damage of monster
 ARMOUR_KEY = 'armour'           # armour of monster
 SLAYER_KEY = 'slayer'           # boolean of whether monster is slayable
 DRAGON_KEY = 'dragon'           # boolean of whether monster has dragonfire
+QUEST_REQ_KEY = 'quest req'     # int representing questid needed to get this monster.
 
 DEFAULT_MONSTER = {
     NAME_KEY: 'unknown mosnter',
@@ -33,7 +34,8 @@ DEFAULT_MONSTER = {
     DAMAGE_KEY: 1,
     ARMOUR_KEY: 1,
     SLAYER_KEY: True,
-    DRAGON_KEY: False
+    DRAGON_KEY: False,
+    QUEST_REQ_KEY: 0
 }
 
 RARITY_NAMES = {
@@ -42,7 +44,8 @@ RARITY_NAMES = {
         128: 'uncommon',
         256: 'rare',
         1024: 'super rare',
-        4096: 'ultra rare'
+        4096: 'ultra rare',
+        8192: 'super duper rare'
     }
 
 
@@ -67,8 +70,7 @@ def get_attr(monsterid, key=NAME_KEY):
         try:
             return MONSTERS[monsterid][key]
         except KeyError:
-            MONSTERS[monsterid][key] = DEFAULT_MONSTER[key]
-            return MONSTERS[monsterid][key]
+            return DEFAULT_MONSTER[key]
     else:
         raise KeyError
 
@@ -123,7 +125,7 @@ def get_rares(monster_name):
 
     rares = []
     for item in list(loottable.keys()):
-        if int(loottable[item]['rarity']) >= 1024:
+        if int(loottable[item]['rarity']) > 256:
             rares.append(item)
     return rares
 
@@ -187,10 +189,13 @@ def print_list():
         monster_list.append((level, name, slayer_req))
     out = header
     for level, name, req in sorted(monster_list):
+        out += f'**{name.title()}** *(combat: {level}'
+        if int(req) > 1:
+            out += f', slayer: {req}'
+        out += ')*\n'
         if len(out) >= 1800:
             messages.append(out)
             out = header
-        out += f'**{name.title()}** *(combat: {level}, slayer: {req})*\n'
     messages.append(out)
     return messages
 
@@ -238,3 +243,15 @@ def print_monster(monster):
             out = f'__**:skull_crossbones: BESTIARY :skull_crossbones:**__\n'
     messages.append(out)
     return messages
+
+
+def print_monster_kills(userid):
+    """Prints the number of monsters a user has killed."""
+    monster_kills = users.read_user(userid, key=users.MONSTERS_KEY)
+
+    out = f'{users.CHARACTER_HEADER}'
+    for monsterid in sorted(list(monster_kills.keys())):
+        if monster_kills[monsterid] > 0:
+            out += f'**{get_attr(monsterid).title()}**: {monster_kills[monsterid]}\n'
+
+    return out

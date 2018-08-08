@@ -1,10 +1,10 @@
-from collections import Counter
-import ujson
 import math
+import ujson
+from collections import Counter
 
 from subs.miniscape import adventures as adv
-from subs.miniscape import users
 from subs.miniscape import items
+from subs.miniscape import users
 from subs.miniscape.files import QUESTS_JSON
 
 with open(QUESTS_JSON, 'r') as f:
@@ -51,8 +51,11 @@ def calc_chance(userid, questid):
     monster_dam = get_attr(questid, key=DAMAGE_KEY)
     monster_combat = get_attr(questid, key=LEVEL_KEY)
     player_combat = users.xp_to_level(users.read_user(userid, key=users.SLAYER_XP_KEY))
-    if get_attr(questid, key=DRAGON_KEY) and '266' not in equipment:
-        monster_base = 100
+    if get_attr(questid, key=DRAGON_KEY):
+        if equipment[7] == '266' or equipment[7] == '293':
+            monster_base = 1
+        else:
+            monster_base = 100
     else:
         monster_base = 1
 
@@ -204,8 +207,8 @@ def print_quest(questid, time, chance):
 def print_status(time_left, *args):
     questid, chance = args[0]
     out = f'{QUEST_HEADER}' \
-          f'You are already on the quest {get_attr(questid)}. You can see the results of this quest in '\
-          f'{time_left} minutes. You currently have a {chance}% of succeeding with your current gear. '
+          f'You are already on the quest {get_attr(questid)}. You can see the results of this quest {time_left}. ' \
+          f'You currently have a {chance}% of succeeding with your current gear. '
     return out
 
 

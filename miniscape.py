@@ -274,7 +274,7 @@ class Miniscape():
 
     @commands.command()
     async def status(self, ctx):
-        """Tells what you are currently doing."""
+        """Says what you are currently doing."""
         if ctx.channel.id == COMBAT_CHANNEL:
             if adv.is_on_adventure(ctx.author.id):
                 out = adv.print_adventure(ctx.author.id)
@@ -308,6 +308,14 @@ class Miniscape():
             out = clues.start_clue(ctx.author.id, parsed_difficulty)
             await ctx.send(out)
 
+    @commands.command(aliases=['drank', 'chug', 'suckle'])
+    async def drink(self, ctx, *args):
+        """Drinks a potion."""
+        if ctx.channel.id == BANK_CHANNEL:
+            name = ' '.join(args)
+            out = items.drink(ctx.author.id, name)
+            await ctx.send(out)
+
     @commands.group(invoke_without_command=True)
     async def shop(self, ctx):
         """Shows the items available at the shop."""
@@ -319,10 +327,16 @@ class Miniscape():
     @shop.command(name='buy')
     async def _buy(self, ctx, *args):
         """Buys something from the shop."""
-        item = ' '.join(args)
         if ctx.channel.id == SHOP_CHANNEL:
-            out = items.buy(ctx.author.id, item, 1)
-            await ctx.send(out)
+            if len(args) > 0:
+                if args[0].isdigit():
+                    number = int(args[0])
+                    item = ' '.join(args[1:])
+                else:
+                    number = 1
+                    item = ' '.join(args)
+                out = items.buy(ctx.author.id, item, number=number)
+                await ctx.send(out)
 
     @shop.command(name='sell')
     async def _sell(self, ctx, *args):
@@ -341,19 +355,23 @@ class Miniscape():
     async def _sellall(self, ctx, maxvalue=None):
         """Sells all items in the player's inventory (below a certain value) for GasterCoin."""
         if ctx.channel.id == SHOP_CHANNEL:
-            inventory = users.read_user(ctx.author.id)
+            inventory = users.read_user(ctx.author.id, key=users.ITEMS_KEY)
             if maxvalue is None:
                 value = users.get_value_of_inventory(inventory)
                 ac.update_account(ctx.author.id, value)
                 users.clear_inventory(ctx.author.id)
+                value_formatted = '{:,}'.format(value)
+                maxvalue_formatted = '{:,}'.format(int(maxvalue))
+                out = f"All items in {ctx.author.name}'s inventory worth under G${maxvalue_formatted} "\
+                      f"sold for G${value_formatted}!"
             else:
                 value = users.get_value_of_inventory(inventory, under=maxvalue)
                 ac.update_account(ctx.author.id, value)
                 users.clear_inventory(ctx.author.id, under=maxvalue)
-            value_formatted = '{:,}'.format(value)
-            maxvalue_formatted = '{:,}'.format(int(maxvalue))
-            await ctx.send(f"All items in {ctx.author.name}'s inventory worth under G${maxvalue_formatted} "
-                           f"sold for G${value_formatted}!")
+                value_formatted = '{:,}'.format(value)
+                out = f"All items in {ctx.author.name}'s inventory "\
+                      f"sold for G${value_formatted}!"
+            await ctx.send(out)
 
     @shop.command(name='trade')
     async def _trade(self, ctx, *args):

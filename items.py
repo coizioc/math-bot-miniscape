@@ -24,6 +24,7 @@ GATHER_KEY = 'gather'       # Boolean whether item can be gathered.
 TREE_KEY = 'tree'           # Boolean whether gatherable is a tree.
 ROCK_KEY = 'rock'           # Boolean whether gatherable is a rock.
 FISH_KEY = 'fish'           # Boolean whether gatherable is a fish.
+POT_KEY = 'potion'  # Boolean whether consumable is a potion.
 DEFAULT_ITEM = {NAME_KEY: 'unknown item',
                 VALUE_KEY: 0,
                 DAMAGE_KEY: 0,
@@ -37,7 +38,8 @@ DEFAULT_ITEM = {NAME_KEY: 'unknown item',
                 GATHER_KEY: False,
                 TREE_KEY: False,
                 ROCK_KEY: False,
-                FISH_KEY: False
+                FISH_KEY: False,
+                POT_KEY: False
                 }
 
 SHOP_HEADER = '__**:moneybag: SHOP :moneybag:**__\n'
@@ -78,6 +80,7 @@ def claim(itemname):
     except ValueError:
         return f"Error: {itemname} is not an item."
 
+
 def compare(item1, item2):
     """Prints a string comparing the stats of two given items."""
     try:
@@ -105,10 +108,31 @@ def compare(item1, item2):
     return out
 
 
+def drink(userid, name):
+    try:
+        itemid = find_by_name(name)
+    except KeyError:
+        return f'Error: {name} does not exist.'
+    item_name = get_attr(itemid)
+
+    is_pot = get_attr(itemid, key=POT_KEY)
+    if is_pot:
+        if users.item_in_inventory(userid, itemid):
+            users.update_inventory(userid, [itemid], remove=True)
+            users.update_user(userid, itemid, users.POTION_KEY)
+        else:
+            return f"You do not have any {add_plural(itemid)} in your inventory."
+    else:
+        return f"{item_name} isn't a potion!"
+
+    out = f'You drank the {item_name}! Your stats will be increased for your next adventure.'
+    return out
+
+
 def find_by_name(name):
     """Finds an item's ID from its name."""
     for item in list(ITEMS.keys()):
-        if name == ITEMS[item][NAME_KEY]:
+        if name.lower() == ITEMS[item][NAME_KEY]:
             return item
     else:
         raise KeyError

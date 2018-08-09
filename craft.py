@@ -148,6 +148,7 @@ def get_gather(person, *args):
           f'{number} {items.add_plural(itemid)} and have gained {xp_formatted} gathering xp! '
     if gather_level_after > gather_level_before:
         out += f'In addition, you have gained {gather_level_after - gather_level_before} gathering levels!'
+    users.update_user(person.id, 0, users.POTION_KEY)
     return out
 
 
@@ -220,6 +221,12 @@ def start_gather(userid, item, length=-1, number=-1):
         item_name = items.get_attr(itemid)
         gather_level = users.xp_to_level(users.read_user(userid, key=users.GATHER_XP_KEY))
         gather_requirement = items.get_attr(itemid, key=items.LEVEL_KEY)
+        player_potion = users.read_user(userid, key=users.POTION_KEY)
+        if player_potion == '435':
+            gather_level = gather_level + 3
+        if player_potion == '436':
+            gather_level = gather_level + 6
+
         if gather_level < gather_requirement:
             return f'Error: {item_name} has a gathering requirement ({gather_requirement}) higher ' \
                    f'than your gathering level ({gather_level})'

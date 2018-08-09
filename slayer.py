@@ -18,6 +18,7 @@ def calc_chance(userid, monsterid, number):
     monster_combat = mon.get_attr(monsterid, key=mon.LEVEL_KEY)
     player_combat = users.xp_to_level(users.read_user(userid, key=users.SLAYER_XP_KEY))
     number = int(number)
+    player_potion = users.read_user(userid, key=users.POTION_KEY)
     if mon.get_attr(monsterid, key=mon.DRAGON_KEY):
         if equipment[7] == '266' or equipment[7] == '293':
             monster_base = 1
@@ -26,10 +27,15 @@ def calc_chance(userid, monsterid, number):
     else:
         monster_base = 1
 
+    if player_potion == '429' or player_potion == '430':
+        player_arm = player_arm * 1.1 + 3
+    if player_potion == '433' or player_potion == '434':
+        player_arm = player_arm * 1.15 + 5
+
     c = 1 + monster_combat / 200
     d = 1 + player_combat / 99
     dam_multiplier = monster_base + monster_acc / 200
-    chance = round(min(100 * max(0, (2 * d * player_arm) / (number / 20 * monster_dam * dam_multiplier + c)), 100))
+    chance = round(min(100 * max(0, (2 * d * player_arm) / (number / 50 * monster_dam * dam_multiplier + c)), 100))
     return chance
 
 
@@ -40,6 +46,7 @@ def calc_length(userid, monsterid, number):
     player_dam, player_acc, player_arm = users.get_equipment_stats(equipment)
     monster_arm = mon.get_attr(monsterid, key=mon.ARMOUR_KEY)
     monster_xp = mon.get_attr(monsterid, key=mon.XP_KEY)
+    player_potion = users.read_user(userid, key=users.POTION_KEY)
     if mon.get_attr(monsterid, key=mon.DRAGON_KEY) == 1:
         if equipment[7] == '266' or equipment[7] == '293':
             monster_base = 1
@@ -47,6 +54,19 @@ def calc_length(userid, monsterid, number):
             monster_base = 100
     else:
         monster_base = 1
+
+    if player_potion == '427' or player_potion == '430':
+        player_acc = player_acc * 1.1 + 3
+    if player_potion == '428' or player_potion == '430':
+        player_dam = player_dam * 1.1 + 3
+    if player_potion == '429' or player_potion == '430':
+        player_arm = player_arm * 1.1 + 3
+    if player_potion == '431' or player_potion == '434':
+        player_acc = player_acc * 1.15 + 5
+    if player_potion == '432' or player_potion == '434':
+        player_dam = player_dam * 1.15 + 5
+    if player_potion == '433' or player_potion == '434':
+        player_arm = player_arm * 1.15 + 5
 
     c = combat_level
     dam_multiplier = 1 + player_acc / 200
@@ -62,10 +82,24 @@ def calc_number(userid, monsterid, time):
     player_dam, player_acc, player_arm = users.get_equipment_stats(equipment)
     monster_arm = mon.get_attr(monsterid, key=mon.ARMOUR_KEY)
     monster_xp = mon.get_attr(monsterid, key=mon.XP_KEY)
+    player_potion = users.read_user(userid, key=users.POTION_KEY)
     if mon.get_attr(monsterid, key=mon.DRAGON_KEY) and '266' not in equipment:
         monster_base = 100
     else:
         monster_base = 1
+
+    if player_potion == '427' or player_potion == '430':
+        player_acc = player_acc * 1.1 + 3
+    if player_potion == '428' or player_potion == '430':
+        player_dam = player_dam * 1.1 + 3
+    if player_potion == '429' or player_potion == '430':
+        player_arm = player_arm * 1.1 + 3
+    if player_potion == '431' or player_potion == '434':
+        player_acc = player_acc * 1.15 + 5
+    if player_potion == '432' or player_potion == '434':
+        player_dam = player_dam * 1.15 + 5
+    if player_potion == '433' or player_potion == '434':
+        player_arm = player_arm * 1.15 + 5
 
     dam_multiplier = 1 + player_acc / 200
 
@@ -98,15 +132,18 @@ def get_kill(userid, monster, length=-1, number=-1):
         if slayer_level < slayer_requirement:
             return f'Error: {monster_name} has a slayer requirement ({slayer_requirement}) higher ' \
                    f'than your slayer level ({slayer_level})'
-
-        if number > 500:
+        if number > 1000 and slayer_level == 99:
+            number = 1000
+        if number > 500 and slayer_level < 99:
             number = 500
         if length > 180:
             length = 180
 
         if int(number) < 0:
             number = calc_number(userid, monsterid, (length + 1) * 60) - 1
-            if number > 500:
+            if number > 1000 and slayer_level == 99:
+                number = 1000
+            if number > 500 and slayer_level < 99:
                 number = 500
         elif int(length) < 0:
             length = math.floor(calc_length(userid, monsterid, number)[1] / 60)
@@ -147,6 +184,7 @@ def get_kill_result(person, *args):
     if cb_level_after > cb_level_before:
         out += f' and {cb_level_after - cb_level_before} combat levels'
     out += '.'
+    users.update_user(person.id, 0, users.POTION_KEY)
     return out
 
 
@@ -162,7 +200,7 @@ def get_result(person, *args):
     users.add_counter(person.id, monsterid, num_to_kill)
 
     if adv.is_success(calc_chance(person.id, monsterid, num_to_kill)):
-
+        users.update_user(person.id, 0, users.POTION_KEY)
         loot = mon.get_loot(monsterid, int(num_to_kill))
         users.update_inventory(person.id, loot)
         out += print_loot(loot, person, monster_name, num_to_kill)
@@ -184,7 +222,7 @@ def get_result(person, *args):
             out += f'Also, as well, you have gained {slay_level_after - slay_level_before} slayer levels. '
 
     else:
-
+        users.update_user(person.id, 0, users.POTION_KEY)
         factor = int(chance)/100
         loot = mon.get_loot(monsterid, int(num_to_kill), factor=factor)
         users.update_inventory(person.id, loot)
@@ -201,7 +239,7 @@ def get_result(person, *args):
         slayer_xp_formatted = '{:,}'.format(xp_gained)
         combat_xp_formatted = '{:,}'.format(round(0.7 * xp_gained))
         out += f'\nYou have received lower loot and experience because you have died.'\
-               f'\nYou have received {slayer_xp_formatted} slayer xp and {combat_xp_formatted} combat xp.'
+               f'\nYou have received {slayer_xp_formatted} slayer xp and {combat_xp_formatted} combat xp. '
         if cb_level_after > cb_level_before:
             out += f'In addition, you have gained {cb_level_after - cb_level_before} combat levels. '
         if slay_level_after > slay_level_before:
@@ -293,7 +331,7 @@ def print_chance(userid, monsterid, monster_dam=-1, monster_acc=-1, monster_arm=
     c = 1 + monster_combat / 200
     d = 1 + player_combat / 99
     dam_multiplier = monster_base + monster_acc / 200
-    chance = round(min(100 * max(0, (2 * d * player_arm) / (number / 20 * monster_dam * dam_multiplier + c)), 100))
+    chance = round(min(100 * max(0, (2 * d * player_arm) / (number / 50 * monster_dam * dam_multiplier + c)), 100))
     # chance = round(min(100 * max(0, (player_arm / (monster_dam * dam_multiplier + 1 + monster_combat / 200)) / 2 + player_combat / 200), 100))
 
     dam_multiplier = 1 + player_acc / 200

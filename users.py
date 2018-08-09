@@ -24,6 +24,7 @@ COMBAT_XP_KEY = 'combat'        # User's combat xp, stored as an int.
 SLAYER_XP_KEY = 'slayer'        # User's slayer xp, stored as an int.
 GATHER_XP_KEY = 'gather'        # User's gathering xp, stored as an int.
 ARTISAN_XP_KEY = 'artisan'      # User's artisan xp, stored as an int.
+POTION_KEY = 'potion'           # User's active potion, stored as an int.
 QUESTS_KEY = 'quests'           # User's complted quest. Storted as a hexidecimal number whose bits represent
                                 # whether a user has completed a quest with that questid.
 DEFAULT_ACCOUNT = {ITEMS_KEY: Counter(),
@@ -34,7 +35,8 @@ DEFAULT_ACCOUNT = {ITEMS_KEY: Counter(),
                    SLAYER_XP_KEY: 0,
                    GATHER_XP_KEY: 0,
                    ARTISAN_XP_KEY: 0,
-                   QUESTS_KEY: "0x0"}
+                   POTION_KEY: 0,
+                   QUESTS_KEY: "0x0"}   # What's this?
 
 CHARACTER_HEADER = f'__**:crossed_swords: CHARACTER :crossed_swords:**__\n'
 
@@ -130,7 +132,7 @@ def get_value_of_inventory(inventory, under=None):
     if under is not None:
         max_value = int(under)
     else:
-        max_value = 2147483647
+        max_value = 999999999999
     total_value = 0
     for item in list(inventory.keys()):
         value = items.get_attr(item, key=items.VALUE_KEY)
@@ -167,6 +169,13 @@ def print_account(userid):
           f'**Slayer Level**: {xp_to_level(slayer_xp)} *({slayer_xp} xp)*\n' \
           f'**Gathering Level**: {xp_to_level(gather_xp)} *({gather_xp} xp)*\n' \
           f'**Artisan Level**: {xp_to_level(artisan_xp)} *({artisan_xp} xp)*\n\n'
+
+    out += f'**Potion**: '
+    potion = read_user(userid, key=POTION_KEY)
+    if potion == 0:
+        out += 'None\n\n'
+    else:
+        out += f'{items.get_attr(potion)}\n\n'
 
     out += print_equipment(userid)
 
@@ -269,7 +278,7 @@ def update_user(userid, value, key=ITEMS_KEY):
     if key == COMBAT_XP_KEY or key == SLAYER_XP_KEY or key == GATHER_XP_KEY or key == ARTISAN_XP_KEY:
         current_xp = accounts[userid][key]
         accounts[userid][key] = current_xp + value
-    elif key == EQUIPMENT_KEY or key == ITEMS_KEY:
+    elif key == EQUIPMENT_KEY or key == ITEMS_KEY or key == POTION_KEY:
         accounts[userid][key] = value
     elif key == QUESTS_KEY:
         current_quests = int(str(accounts[userid][key])[2:], 16)

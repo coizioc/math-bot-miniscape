@@ -1,8 +1,11 @@
 import ujson
 from collections import Counter
+import time
+import os
+import shutil
 
 from subs.miniscape import items
-from subs.miniscape.files import USERS_JSON, XP_FILE, ARMOUR_SLOTS_FILE
+from subs.miniscape.files import USER_DIRECTORY, BACKUP_DIRECTORY, XP_FILE, ARMOUR_SLOTS_FILE
 
 XP = {}
 with open(XP_FILE, 'r') as f:
@@ -19,7 +22,7 @@ with open(ARMOUR_SLOTS_FILE, 'r') as f:
 ITEMS_KEY = 'items'             # User's inventory, stored as a Counter.
 MONSTERS_KEY = 'monsters'       # Count of monsters user has killed, stored as a Counter.
 CLUES_KEY = 'clues'             # Count of clues user has completed, stored as a Counter.
-EQUIPMENT_KEY = 'equip'         # User's equipment, stored as a list of size 13 initialized to -1.
+EQUIPMENT_KEY = 'equip'         # User's equipment, stored as an empty dicr.
 COMBAT_XP_KEY = 'combat'        # User's combat xp, stored as an int.
 SLAYER_XP_KEY = 'slayer'        # User's slayer xp, stored as an int.
 GATHER_XP_KEY = 'gather'        # User's gathering xp, stored as an int.
@@ -30,12 +33,11 @@ QUESTS_KEY = 'quests'           # User's complted quest. Storted as a hexidecima
 DEFAULT_ACCOUNT = {ITEMS_KEY: Counter(),
                    MONSTERS_KEY: Counter(),
                    CLUES_KEY: Counter(),
-                   EQUIPMENT_KEY: [-1]*15,
+                   EQUIPMENT_KEY: dict(zip(range(1, 16), 15*[-1])),
                    COMBAT_XP_KEY: 0,
                    SLAYER_XP_KEY: 0,
                    GATHER_XP_KEY: 0,
                    ARTISAN_XP_KEY: 0,
-                   POTION_KEY: 0,
                    QUESTS_KEY: "0x0"}   # What's this?
 
 CHARACTER_HEADER = f'__**:crossed_swords: CHARACTER :crossed_swords:**__\n'
@@ -44,17 +46,26 @@ CHARACTER_HEADER = f'__**:crossed_swords: CHARACTER :crossed_swords:**__\n'
 def add_counter(userid, value, number, key=MONSTERS_KEY):
     """Adds a Counter to another Counter in a user's account."""
     new_counts = Counter({value: int(number)})
-    with open(USERS_JSON, 'r') as f:
-        accounts = ujson.load(f)
-    userid = str(userid)
     try:
-        monster_kills = Counter(accounts[userid][key])
-        monster_kills = monster_kills + new_counts
-        accounts[userid][key] = monster_kills
-    except KeyError:
-        accounts[userid][key] = new_counts
-    with open(USERS_JSON, 'w') as f:
-        ujson.dump(accounts, f)
+        with open(f'{USER_DIRECTORY}{userid}.json', 'r') as f:
+            userjson = ujson.load(f)
+        counts = Counter(userjson[key])
+        total_counts = counts + new_counts
+        userjson[key] = total_counts
+    except FileNotFoundError:
+        userjson = DEFAULT_ACCOUNT
+        userjson[MONSTERS_KEY] = new_counts
+    with open(f'{USER_DIRECTORY}{userid}.json', 'w+') as f:
+        ujson.dump(userjson, f)
+
+
+def backup():
+    """Backs up the user files."""
+    current_time = int(time.time())
+    destination = f'{BACKUP_DIRECTORY}{current_time}/'
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
+    for file in os.listdir(USER_DIRECTORY):
+        shutil.copy(f'{USER_DIRECTORY}{file}', destination)
 
 
 def clear_inventory(userid, under=None):
@@ -83,23 +94,48 @@ def equip_item(userid, item):
     if user_cb_level >= item_level:
         item_name = items.get_attr(itemid)
         if item_in_inventory(userid, itemid):
-            slot = items.get_attr(itemid, key=items.SLOT_KEY)
-            if slot > 0:
+            slot = str(items.get_attr(itemid, key=items.SLOT_KEY))
+            if int(slot) > 0:
                 equipment = read_user(userid, key=EQUIPMENT_KEY)
-                if equipment[slot] == -1:
+                if slot not in equipment.keys() or equipment[slot] == -1:
                     equipment[slot] = itemid
                 else:
                     update_inventory(userid, [equipment[slot]])
                     equipment[slot] = itemid
                 update_inventory(userid, [itemid], remove=True)
                 update_user(userid, equipment, EQUIPMENT_KEY)
-                return f'{item_name} equipped to {SLOTS[str(slot)]}!'
+                return f'{item_name} equipped to {SLOTS[slot]}!'
             else:
                 return f'Error: {item_name} cannot be equipped.'
         else:
             return f'Error: {item_name} not in inventory.'
     else:
         return f'Error: Insufficient level to equip item ({item_level}). Your current combat level is {user_cb_level}.'
+
+
+def unequip_item(userid, item):
+    """Takes an item out of a user's equipment and places it into their inventory."""
+    try:
+        itemid = items.find_by_name(item)
+    except KeyError:
+        return f'Error: {item} does not exist.'
+
+    item_name = items.get_attr(itemid)
+    equipment = read_user(userid, key=EQUIPMENT_KEY)
+    if itemid in equipment.values():
+        slot = str(items.get_attr(itemid, key=items.SLOT_KEY))
+        if int(slot) > 0:
+            equipment = read_user(userid, key=EQUIPMENT_KEY)
+            if equipment[slot] == -1:
+                return f'{item_name} is not equipped in {SLOTS[str(slot)]}.'
+            update_inventory(userid, [itemid])
+            equipment[slot] = -1
+            update_user(userid, equipment, EQUIPMENT_KEY)
+            return f'{item_name} unequipped from {SLOTS[str(slot)]}!'
+        else:
+            return f'Error: {item_name} cannot be unequipped.'
+    else:
+        return f'You do not have {item_name} equipped.'
 
 
 def get_completed_quests(userid):
@@ -117,14 +153,20 @@ def get_equipment_stats(equipment):
     damage = 0
     accuracy = 0
     armour = 0
-    for item in equipment:
+    for itemid in equipment.values():
         try:
-            damage += items.get_attr(item, key=items.DAMAGE_KEY)
-            accuracy += items.get_attr(item, key=items.ACCURACY_KEY)
-            armour += items.get_attr(item, key=items.ARMOUR_KEY)
+            damage += items.get_attr(itemid, key=items.DAMAGE_KEY)
+            accuracy += items.get_attr(itemid, key=items.ACCURACY_KEY)
+            armour += items.get_attr(itemid, key=items.ARMOUR_KEY)
         except KeyError:
             pass
     return damage, accuracy, armour
+
+
+def get_level(userid, key):
+    """Gets a user's skill level from their userid."""
+    xp = read_user(userid, key=key)
+    return xp_to_level(xp)
 
 
 def get_value_of_inventory(inventory, under=None):
@@ -143,13 +185,11 @@ def get_value_of_inventory(inventory, under=None):
 
 def item_in_inventory(userid, item, number=1):
     """Determines whether (a given number of) an item is in a user's inventory."""
-    with open(USERS_JSON, 'r') as f:
-        accounts = ujson.load(f)
-
-    userid = str(userid)
+    with open(f'{USER_DIRECTORY}{userid}.json', 'r+') as f:
+        userjson = ujson.load(f)
 
     try:
-        count = accounts[userid][ITEMS_KEY][item]
+        count = userjson[ITEMS_KEY][item]
         if int(count) >= int(number):
             return True
         else:
@@ -170,13 +210,6 @@ def print_account(userid):
           f'**Gathering Level**: {xp_to_level(gather_xp)} *({gather_xp} xp)*\n' \
           f'**Artisan Level**: {xp_to_level(artisan_xp)} *({artisan_xp} xp)*\n\n'
 
-    out += f'**Potion**: '
-    potion = read_user(userid, key=POTION_KEY)
-    if potion == 0:
-        out += 'None\n\n'
-    else:
-        out += f'{items.get_attr(potion)}\n\n'
-
     out += print_equipment(userid)
 
     return out
@@ -190,13 +223,13 @@ def print_equipment(userid):
     out += f'**Damage**: {damage}\n' \
            f'**Accuracy**: {accuracy}\n' \
            f'**Armour**: {armour}\n\n'
-    for i in range(1, len(equipment)):
-        out += f'**{SLOTS[str(i)].title()}**: '
-        if int(equipment[i]) > -1:
-            out += f'{items.get_attr(equipment[i])} ' \
-                   f'*(dam: {items.get_attr(equipment[i], key=items.DAMAGE_KEY)}, ' \
-                   f'acc: {items.get_attr(equipment[i], key=items.ACCURACY_KEY)}, ' \
-                   f'arm: {items.get_attr(equipment[i], key=items.ARMOUR_KEY)})*\n'
+    for slot in equipment.keys():
+        out += f'**{SLOTS[str(slot)].title()}**: '
+        if int(equipment[slot]) > -1:
+            out += f'{items.get_attr(equipment[slot])} ' \
+                   f'*(dam: {items.get_attr(equipment[slot], key=items.DAMAGE_KEY)}, ' \
+                   f'acc: {items.get_attr(equipment[slot], key=items.ACCURACY_KEY)}, ' \
+                   f'arm: {items.get_attr(equipment[slot], key=items.ARMOUR_KEY)})*\n'
         else:
             out += f'none *(dam: 0, acc: 0, arm: 0)*\n'
     return out
@@ -231,62 +264,69 @@ def print_inventory(person, search):
 
 def read_user(userid, key=ITEMS_KEY):
     """Reads the value of a key within a user's account."""
-    userid = str(userid)
     try:
-        with open(USERS_JSON, 'r') as f:
-            accounts = ujson.load(f)
-        if userid not in accounts:
-            accounts[userid] = DEFAULT_ACCOUNT
-        if key not in accounts[userid].keys():
-            accounts[userid][key] = DEFAULT_ACCOUNT[key]
-            with open(USERS_JSON, 'w') as f:
-                ujson.dump(accounts, f)
-        return accounts[userid][key]
+        with open(f'{USER_DIRECTORY}{userid}.json', 'r') as f:
+            userjson = ujson.load(f)
+        return userjson[key]
+    except FileNotFoundError:
+        userjson = DEFAULT_ACCOUNT
+        with open(f'{USER_DIRECTORY}{userid}.json', 'w+') as f:
+            ujson.dump(userjson, f)
+        return userjson[key]
     except KeyError:
-        return 0
+        userjson[key] = DEFAULT_ACCOUNT[key]
+        with open(f'{USER_DIRECTORY}{userid}.json', 'w+') as f:
+            ujson.dump(userjson, f)
+        return userjson[key]
+
+
+def remove_potion(userid):
+    """Removes a potion from a player's equipment."""
+    equipment = read_user(userid, key=EQUIPMENT_KEY)
+    equipment['15'] = -1
+    update_user(userid, equipment, key=EQUIPMENT_KEY)
 
 
 def update_inventory(userid, loot, remove=False):
     """Adds or removes items from a user's inventory."""
-    with open(USERS_JSON, 'r') as f:
-        accounts = ujson.load(f)
     try:
-        inventory = Counter(accounts[str(userid)]['items'])
+        with open(f'{USER_DIRECTORY}{userid}.json', 'r') as f:
+            userjson = ujson.load(f)
+        inventory = Counter(userjson[ITEMS_KEY])
         loot = Counter(loot)
         inventory = inventory - loot if remove else inventory + loot
-        accounts[str(userid)]['items'] = inventory
+        userjson[ITEMS_KEY] = inventory
     except KeyError:
-        if remove:
-            raise ValueError
-        else:
-            accounts[str(userid)] = {}
-            accounts[str(userid)]['items'] = Counter(loot)
-    with open(USERS_JSON, 'w') as f:
-        ujson.dump(accounts, f)
+        raise ValueError
+    except FileNotFoundError:
+        userjson = DEFAULT_ACCOUNT
+        userjson[ITEMS_KEY] = Counter(loot)
+
+    with open(f'{USER_DIRECTORY}{userid}.json', 'w+') as f:
+        ujson.dump(userjson, f)
 
 
 def update_user(userid, value, key=ITEMS_KEY):
     """Changes the value of a key within a user's account."""
     userid = str(userid)
-    with open(USERS_JSON, 'r') as f:
-        accounts = ujson.load(f)
+    try:
+        with open(f'{USER_DIRECTORY}{userid}.json', 'r') as f:
+            userjson = ujson.load(f)
+    except FileNotFoundError:
+        userjson = DEFAULT_ACCOUNT
 
-    if userid not in accounts:
-        accounts[userid] = DEFAULT_ACCOUNT
-    if key not in accounts[userid].keys():
-        accounts[userid][key] = DEFAULT_ACCOUNT[key]
     if key == COMBAT_XP_KEY or key == SLAYER_XP_KEY or key == GATHER_XP_KEY or key == ARTISAN_XP_KEY:
-        current_xp = accounts[userid][key]
-        accounts[userid][key] = current_xp + value
+        current_xp = userjson[key]
+        userjson[key] = current_xp + value
     elif key == EQUIPMENT_KEY or key == ITEMS_KEY or key == POTION_KEY:
-        accounts[userid][key] = value
+        userjson[key] = value
     elif key == QUESTS_KEY:
-        current_quests = int(str(accounts[userid][key])[2:], 16)
+        current_quests = int(str(userjson[key])[2:], 16)
         current_quests = current_quests | 1 << (int(value) - 1)
-        accounts[userid][key] = str(hex(current_quests))
+        userjson[key] = str(hex(current_quests))
 
-    with open(USERS_JSON, 'w') as f:
-        ujson.dump(accounts, f)
+    with open(f'{USER_DIRECTORY}{userid}.json', 'w+') as f:
+        ujson.dump(userjson, f)
 
 
 def xp_to_level(xp):

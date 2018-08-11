@@ -5,7 +5,7 @@ from collections import Counter
 from subs.miniscape import adventures as adv
 from subs.miniscape import items
 from subs.miniscape import users
-from subs.miniscape.files import RECIPE_JSON
+from subs.miniscape.files import RECIPE_JSON, XP_FACTOR
 
 GATHER_HEADER = f':hammer_pick: __**GATHERING**__ :hammer_pick: \n'
 CRAFT_HEADER = f':hammer_pick: __**CRAFTING**__ :hammer_pick: \n'
@@ -48,7 +48,7 @@ def craft(userid, recipe, n=1):
 
     users.update_inventory(userid, loot, remove=True)
     users.update_inventory(userid, n * [recipeid])
-    xp = n * items.get_attr(recipeid, key=items.XP_KEY)
+    xp = XP_FACTOR * n * items.get_attr(recipeid, key=items.XP_KEY)
     users.update_user(userid, xp, key=users.ARTISAN_XP_KEY)
     level_after = users.xp_to_level(users.read_user(userid, users.ARTISAN_XP_KEY))
 
@@ -136,7 +136,7 @@ def get_gather(person, *args):
         print(e)
         raise ValueError
     loot = int(number) * [itemid]
-    xp = int(number) * items.get_attr(itemid, key=items.XP_KEY)
+    xp = XP_FACTOR * int(number) * items.get_attr(itemid, key=items.XP_KEY)
     users.update_inventory(person.id, loot)
     gather_level_before = users.xp_to_level(users.read_user(person.id, users.GATHER_XP_KEY))
     users.update_user(person.id, xp, key=users.GATHER_XP_KEY)
@@ -148,7 +148,7 @@ def get_gather(person, *args):
           f'{number} {items.add_plural(itemid)} and have gained {xp_formatted} gathering xp! '
     if gather_level_after > gather_level_before:
         out += f'In addition, you have gained {gather_level_after - gather_level_before} gathering levels!'
-    users.update_user(person.id, 0, users.POTION_KEY)
+    users.remove_potion(person.id)
     return out
 
 
@@ -221,7 +221,7 @@ def start_gather(userid, item, length=-1, number=-1):
         item_name = items.get_attr(itemid)
         gather_level = users.xp_to_level(users.read_user(userid, key=users.GATHER_XP_KEY))
         gather_requirement = items.get_attr(itemid, key=items.LEVEL_KEY)
-        player_potion = users.read_user(userid, key=users.POTION_KEY)
+        player_potion = users.read_user(userid, key=users.EQUIPMENT_KEY)['15']
         if player_potion == '435':
             gather_level = gather_level + 3
         if player_potion == '436':

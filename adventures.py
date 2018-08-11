@@ -122,7 +122,7 @@ def print_adventure(userid):
     if time_left == 1:
         time_string = 'in 1 minute'
     elif time_left < 1:
-        time_string = '   soon'
+        time_string = 'soon'
     else:
         time_string = f'in {time_left} minutes'
     out = adventures[adventureid](time_string, adventure[3:])

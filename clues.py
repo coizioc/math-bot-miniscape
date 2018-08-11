@@ -41,24 +41,19 @@ def calc_length(userid, difficulty):
 
 
 def get_clue_scroll(person, *args):
-    print('in get_clue_scroll')
     try:
         difficulty, length = args[0]
     except ValueError as e:
         print(e)
         raise ValueError
-    print(1)
     difficulty = int(difficulty)
     loot = get_loot(difficulty)
-    print(2)
     users.update_inventory(person.id, loot)
     users.add_counter(person.id, str(difficulty), 1, key=users.CLUES_KEY)
-    print(3)
     out = f'{CLUE_HEADER}' \
           f'{person.mention}, you have finished your {DIFFICULTY[int(difficulty)]} clue scroll! ' \
           f'You have received the following items:\n'
     out += print_loot(loot, difficulty)
-    print('done')
     return out
 
 

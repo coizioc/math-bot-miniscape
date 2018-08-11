@@ -1,5 +1,6 @@
 import math
 
+from subs.miniscape.files import XP_FACTOR
 from subs.miniscape import adventures as adv
 from subs.miniscape import items
 from subs.miniscape import monsters as mon
@@ -18,15 +19,15 @@ def calc_chance(userid, monsterid, number):
     monster_combat = mon.get_attr(monsterid, key=mon.LEVEL_KEY)
     player_combat = users.xp_to_level(users.read_user(userid, key=users.SLAYER_XP_KEY))
     number = int(number)
-    player_potion = users.read_user(userid, key=users.POTION_KEY)
     if mon.get_attr(monsterid, key=mon.DRAGON_KEY):
-        if equipment[7] == '266' or equipment[7] == '293':
+        if equipment['7'] == '266' or equipment['7'] == '293':
             monster_base = 1
         else:
             monster_base = 100
     else:
         monster_base = 1
 
+    player_potion = equipment['15']
     if player_potion == '429' or player_potion == '430':
         player_arm = player_arm * 1.1 + 3
     if player_potion == '433' or player_potion == '434':
@@ -46,15 +47,15 @@ def calc_length(userid, monsterid, number):
     player_dam, player_acc, player_arm = users.get_equipment_stats(equipment)
     monster_arm = mon.get_attr(monsterid, key=mon.ARMOUR_KEY)
     monster_xp = mon.get_attr(monsterid, key=mon.XP_KEY)
-    player_potion = users.read_user(userid, key=users.POTION_KEY)
     if mon.get_attr(monsterid, key=mon.DRAGON_KEY) == 1:
-        if equipment[7] == '266' or equipment[7] == '293':
+        if equipment['7'] == '266' or equipment['7'] == '293':
             monster_base = 1
         else:
             monster_base = 100
     else:
         monster_base = 1
 
+    player_potion = equipment['15']
     if player_potion == '427' or player_potion == '430':
         player_acc = player_acc * 1.1 + 3
     if player_potion == '428' or player_potion == '430':
@@ -82,12 +83,15 @@ def calc_number(userid, monsterid, time):
     player_dam, player_acc, player_arm = users.get_equipment_stats(equipment)
     monster_arm = mon.get_attr(monsterid, key=mon.ARMOUR_KEY)
     monster_xp = mon.get_attr(monsterid, key=mon.XP_KEY)
-    player_potion = users.read_user(userid, key=users.POTION_KEY)
     if mon.get_attr(monsterid, key=mon.DRAGON_KEY) and '266' not in equipment:
-        monster_base = 100
+        if equipment['7'] == '266' or equipment['7'] == '293':
+            monster_base = 1
+        else:
+            monster_base = 100
     else:
         monster_base = 1
 
+    player_potion = equipment['15']
     if player_potion == '427' or player_potion == '430':
         player_acc = player_acc * 1.1 + 3
     if player_potion == '428' or player_potion == '430':
@@ -184,13 +188,12 @@ def get_kill_result(person, *args):
     if cb_level_after > cb_level_before:
         out += f' and {cb_level_after - cb_level_before} combat levels'
     out += '.'
-    users.update_user(person.id, 0, users.POTION_KEY)
+    users.remove_potion(person.id)
     return out
 
 
 def get_result(person, *args):
     """Determines the success and loot of a slayer task."""
-
     try:
         monsterid, monster_name, num_to_kill, chance = args[0]
     except ValueError as e:
@@ -198,14 +201,14 @@ def get_result(person, *args):
         raise ValueError
     out = ''
     users.add_counter(person.id, monsterid, num_to_kill)
-
     if adv.is_success(calc_chance(person.id, monsterid, num_to_kill)):
-        users.update_user(person.id, 0, users.POTION_KEY)
+
+        users.remove_potion(person.id)
         loot = mon.get_loot(monsterid, int(num_to_kill))
         users.update_inventory(person.id, loot)
         out += print_loot(loot, person, monster_name, num_to_kill)
 
-        xp_gained = mon.get_attr(monsterid, key=mon.XP_KEY) * int(num_to_kill)
+        xp_gained = XP_FACTOR * mon.get_attr(monsterid, key=mon.XP_KEY) * int(num_to_kill)
         cb_level_before = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
         slay_level_before = users.xp_to_level(users.read_user(person.id, users.SLAYER_XP_KEY))
         users.update_user(person.id, xp_gained, users.SLAYER_XP_KEY)
@@ -220,15 +223,14 @@ def get_result(person, *args):
             out += f'In addition, you have gained {cb_level_after - cb_level_before} combat levels. '
         if slay_level_after > slay_level_before:
             out += f'Also, as well, you have gained {slay_level_after - slay_level_before} slayer levels. '
-
     else:
-        users.update_user(person.id, 0, users.POTION_KEY)
+        users.remove_potion(person.id)
         factor = int(chance)/100
         loot = mon.get_loot(monsterid, int(num_to_kill), factor=factor)
         users.update_inventory(person.id, loot)
         out += print_loot(loot, person, monster_name, num_to_kill)
 
-        xp_gained = round(mon.get_attr(monsterid, key=mon.XP_KEY) * int(num_to_kill) * factor)
+        xp_gained = round(XP_FACTOR * mon.get_attr(monsterid, key=mon.XP_KEY) * int(num_to_kill) * factor)
         cb_level_before = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
         slay_level_before = users.xp_to_level(users.read_user(person.id, users.SLAYER_XP_KEY))
         users.update_user(person.id, xp_gained, users.SLAYER_XP_KEY)

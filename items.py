@@ -1,5 +1,7 @@
 """This module contains methods that handle items and their attributes."""
 import ujson
+import random
+from collections import Counter
 
 from subs.gastercoin import account as ac
 from subs.miniscape import monsters as mon
@@ -24,7 +26,7 @@ GATHER_KEY = 'gather'       # Boolean whether item can be gathered.
 TREE_KEY = 'tree'           # Boolean whether gatherable is a tree.
 ROCK_KEY = 'rock'           # Boolean whether gatherable is a rock.
 FISH_KEY = 'fish'           # Boolean whether gatherable is a fish.
-POT_KEY = 'potion'  # Boolean whether consumable is a potion.
+POT_KEY = 'potion'          # Boolean whether consumable is a potion.
 DEFAULT_ITEM = {NAME_KEY: 'unknown item',
                 VALUE_KEY: 0,
                 DAMAGE_KEY: 0,
@@ -74,11 +76,40 @@ def buy(userid, item, number):
         return f'Error: {item_name} not in inventory or you do not have at least {number} in your inventory.'
 
 
-def claim(itemname):
+def claim(userid, itemname, number):
     try:
         itemid = find_by_name(itemname)
     except ValueError:
         return f"Error: {itemname} is not an item."
+
+    if not users.item_in_inventory(userid, itemid, number):
+        return f'You do not have {number} {add_plural(itemid)} in your inventory.'
+
+    out = '__**CLAIM**__ :moneybag:\n'
+
+    if int(itemid) == 402:
+        out += 'You have received:\n'
+        gems = {
+            "25": 4,
+            "26": 16,
+            "27": 64,
+            "28": 128
+        }
+        loot = []
+        for _ in range(number):
+            for _ in range(4):
+                gem_type = random.randint(25, 28)
+                if random.randint(1, gems[gem_type]) == 1:
+                    loot.append(gem_type)
+        users.update_inventory(userid, loot)
+        loot_counter = Counter(loot)
+        for itemid in loot_counter.keys():
+            out += f'{loot_counter[itemid]} {add_plural(itemid)}\n'
+        out += f'from your {add_plural(itemid)}.'
+
+    else:
+        out += f'{get_attr(itemid)} is not claimable.'
+    return out
 
 
 def compare(item1, item2):

@@ -3,8 +3,10 @@ from collections import Counter
 import time
 import os
 import shutil
+import datetime
 
 from subs.miniscape import items
+from subs.miniscape import quests
 from subs.miniscape.files import USER_DIRECTORY, BACKUP_DIRECTORY, XP_FILE, ARMOUR_SLOTS_FILE
 
 XP = {}
@@ -19,18 +21,21 @@ with open(ARMOUR_SLOTS_FILE, 'r') as f:
         line_split = line.split(';')
         SLOTS[line_split[0]] = line_split[1]
 
+IRONMAN_KEY = 'ironman'         # User's ironman status, stored as a boolean.
 ITEMS_KEY = 'items'             # User's inventory, stored as a Counter.
 MONSTERS_KEY = 'monsters'       # Count of monsters user has killed, stored as a Counter.
 CLUES_KEY = 'clues'             # Count of clues user has completed, stored as a Counter.
-EQUIPMENT_KEY = 'equip'         # User's equipment, stored as an empty dicr.
+EQUIPMENT_KEY = 'equip'         # User's equipment, stored as a dicr.
 COMBAT_XP_KEY = 'combat'        # User's combat xp, stored as an int.
 SLAYER_XP_KEY = 'slayer'        # User's slayer xp, stored as an int.
 GATHER_XP_KEY = 'gather'        # User's gathering xp, stored as an int.
 ARTISAN_XP_KEY = 'artisan'      # User's artisan xp, stored as an int.
+LAST_REAPER_KEY = 'reaper'      # Date of user's last reaper task, stored as a date object.
 POTION_KEY = 'potion'           # User's active potion, stored as an int.
-QUESTS_KEY = 'quests'           # User's complted quest. Storted as a hexidecimal number whose bits represent
+QUESTS_KEY = 'quests'           # User's completed quests. Stored as a hexadecimal number whose bits represent
                                 # whether a user has completed a quest with that questid.
-DEFAULT_ACCOUNT = {ITEMS_KEY: Counter(),
+DEFAULT_ACCOUNT = {IRONMAN_KEY: False,
+                   ITEMS_KEY: Counter(),
                    MONSTERS_KEY: Counter(),
                    CLUES_KEY: Counter(),
                    EQUIPMENT_KEY: dict(zip(range(1, 16), 15*[-1])),
@@ -38,9 +43,10 @@ DEFAULT_ACCOUNT = {ITEMS_KEY: Counter(),
                    SLAYER_XP_KEY: 0,
                    GATHER_XP_KEY: 0,
                    ARTISAN_XP_KEY: 0,
+                   LAST_REAPER_KEY: datetime.date.today() - datetime.timedelta(days=1),
                    QUESTS_KEY: "0x0"}   # What's this?
 
-CHARACTER_HEADER = f'__**:crossed_swords: CHARACTER :crossed_swords:**__\n'
+CHARACTER_HEADER = f'__**:crossed_swords: $NAME :crossed_swords:**__\n'
 
 
 def add_counter(userid, value, number, key=MONSTERS_KEY):
@@ -138,6 +144,10 @@ def unequip_item(userid, item):
         return f'You do not have {item_name} equipped.'
 
 
+def get_coins_in_inventory(userid):
+    return
+    # TODO finish this method.
+
 def get_completed_quests(userid):
     hex_number = int(str(read_user(userid, key=QUESTS_KEY))[2:], 16)
     binary_number = str(bin(hex_number))[2:]
@@ -198,26 +208,64 @@ def item_in_inventory(userid, item, number=1):
         return False
 
 
-def print_account(userid):
+def parse_int(number_as_string):
+    """Converts an string into an int if the string represents a valid integer"""
+    try:
+        if len(number_as_string) > 1:
+            int(str(number_as_string)[:-1])
+        else:
+            if len(number_as_string) == 0:
+                raise ValueError
+            if len(number_as_string) == 1 and number_as_string.isdigit():
+                return int(number_as_string)
+            else:
+                raise ValueError
+    except ValueError:
+        raise ValueError
+    last_char = str(number_as_string)[-1]
+    if last_char.isdigit():
+        return int(number_as_string)
+    elif last_char == 'k':
+        return int(number_as_string[:-1]) * 1000
+    elif last_char == 'm':
+        return int(number_as_string[:-1]) * 1000000
+    elif last_char == 'b':
+        return int(number_as_string[:-1]) * 1000000000
+    else:
+        raise ValueError
+
+
+def print_account(userid, nickname, printequipment=True):
     """Writes a string showing basic user information."""
     combat_xp = read_user(userid, key=COMBAT_XP_KEY)
     slayer_xp = read_user(userid, key=SLAYER_XP_KEY)
     gather_xp = read_user(userid, key=GATHER_XP_KEY)
     artisan_xp = read_user(userid, key=ARTISAN_XP_KEY)
-    out = f'{CHARACTER_HEADER}'\
-          f'**Combat Level**: {xp_to_level(combat_xp)} *({combat_xp} xp)*\n'\
-          f'**Slayer Level**: {xp_to_level(slayer_xp)} *({slayer_xp} xp)*\n' \
-          f'**Gathering Level**: {xp_to_level(gather_xp)} *({gather_xp} xp)*\n' \
-          f'**Artisan Level**: {xp_to_level(artisan_xp)} *({artisan_xp} xp)*\n\n'
+    combat_level = xp_to_level(combat_xp)
+    slayer_level = xp_to_level(slayer_xp)
+    gather_level = xp_to_level(gather_xp)
+    artisan_level = xp_to_level(artisan_xp)
+    total = combat_level + slayer_level + gather_level + artisan_level
+    out = f"{CHARACTER_HEADER.replace('$NAME', nickname.upper())}"\
+          f'**Combat Level**: {combat_level} *({combat_xp} xp)*\n'\
+          f'**Slayer Level**: {slayer_level} *({slayer_xp} xp)*\n' \
+          f'**Gathering Level**: {gather_level} *({gather_xp} xp)*\n' \
+          f'**Artisan Level**: {artisan_level} *({artisan_xp} xp)*\n'\
+          f'**Skill Total**: {total}/{4 * 99}\n\n'\
+          f'**Quests Completed**: {len(get_completed_quests(userid))}/{len(quests.QUESTS.keys())}\n\n'
 
-    out += print_equipment(userid)
+    if printequipment:
+        out += print_equipment(userid)
 
     return out
 
 
-def print_equipment(userid):
+def print_equipment(userid, name=None, with_header=False):
     """Writes a string showing the stats of a user's equipment."""
-    out = ''
+    if with_header and name is not None:
+        out = f"{CHARACTER_HEADER.replace('$NAME', name.upper())}"
+    else:
+        out = ''
     equipment = read_user(userid, key=EQUIPMENT_KEY)
     damage, accuracy, armour = get_equipment_stats(equipment)
     out += f'**Damage**: {damage}\n' \
@@ -238,7 +286,11 @@ def print_equipment(userid):
 def print_inventory(person, search):
     """Prints a list of a user's inventory into discord message-sized chunks."""
     inventory = read_user(person.id)
-    header = f":moneybag: __**{person.name.upper()}'S INVENTORY**__ :moneybag:\n"
+    if person.nick is None:
+        name = person.name
+    else:
+        name = person.nick
+    header = f":moneybag: __**{name.upper()}'S INVENTORY**__ :moneybag:\n"
     messages = []
     out = header
     for itemid in list(inventory.keys()):
@@ -287,6 +339,13 @@ def remove_potion(userid):
     update_user(userid, equipment, key=EQUIPMENT_KEY)
 
 
+def reset_account(userid):
+    """Sets a user's keys to the DEFAULT_ACCOUNT."""
+    userjson = DEFAULT_ACCOUNT
+    with open(f'{USER_DIRECTORY}{userid}.json', 'w+') as f:
+        ujson.dump(userjson, f)
+
+
 def update_inventory(userid, loot, remove=False):
     """Adds or removes items from a user's inventory."""
     try:
@@ -318,12 +377,12 @@ def update_user(userid, value, key=ITEMS_KEY):
     if key == COMBAT_XP_KEY or key == SLAYER_XP_KEY or key == GATHER_XP_KEY or key == ARTISAN_XP_KEY:
         current_xp = userjson[key]
         userjson[key] = current_xp + value
-    elif key == EQUIPMENT_KEY or key == ITEMS_KEY or key == POTION_KEY:
-        userjson[key] = value
     elif key == QUESTS_KEY:
         current_quests = int(str(userjson[key])[2:], 16)
         current_quests = current_quests | 1 << (int(value) - 1)
         userjson[key] = str(hex(current_quests))
+    else:
+        userjson[key] = value
 
     with open(f'{USER_DIRECTORY}{userid}.json', 'w+') as f:
         ujson.dump(userjson, f)

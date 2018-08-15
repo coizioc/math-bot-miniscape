@@ -3,7 +3,6 @@ import ujson
 import random
 from collections import Counter
 
-from subs.gastercoin import account as ac
 from subs.miniscape import monsters as mon
 from subs.miniscape import clues
 from subs.miniscape import users
@@ -27,6 +26,7 @@ TREE_KEY = 'tree'           # Boolean whether gatherable is a tree.
 ROCK_KEY = 'rock'           # Boolean whether gatherable is a rock.
 FISH_KEY = 'fish'           # Boolean whether gatherable is a fish.
 POT_KEY = 'potion'          # Boolean whether consumable is a potion.
+LUCK_KEY = 'luck'           # float representing factor of luck enhancement
 DEFAULT_ITEM = {NAME_KEY: 'unknown item',
                 VALUE_KEY: 0,
                 DAMAGE_KEY: 0,
@@ -41,7 +41,8 @@ DEFAULT_ITEM = {NAME_KEY: 'unknown item',
                 TREE_KEY: False,
                 ROCK_KEY: False,
                 FISH_KEY: False,
-                POT_KEY: False
+                POT_KEY: False,
+                LUCK_KEY: 1
                 }
 
 SHOP_HEADER = '__**:moneybag: SHOP :moneybag:**__\n'
@@ -60,16 +61,19 @@ def buy(userid, item, number):
         return f'Error: {item} is not an item.'
     except ValueError:
         return f'Error: {number} is not a number.'
-
     item_name = get_attr(itemid)
     if item_in_shop(itemid):
         items = open_shop()
         if int(items[itemid]) in users.get_completed_quests(userid) or int(items[itemid]) == 0:
             value = get_attr(itemid, key=VALUE_KEY)
-            users.update_inventory(userid, [itemid]*number)
-            ac.update_account(userid, -(4 * number * value))
-            value_formatted = '{:,}'.format(4 * value * number)
-            return f'{number} {item_name} bought for G${value_formatted}!'
+            cost = 4 * number * value
+            if users.item_in_inventory(userid, "0", cost):
+                users.update_inventory(userid, [itemid]*number)
+                users.update_inventory(userid, (4 * number * value) * ["0"], remove=True)
+                value_formatted = '{:,}'.format(4 * value * number)
+                return f'{number} {item_name} bought for {value_formatted} coins!'
+            else:
+                return f'You do not have enough coins to buy this item. ({cost} coins)'
         else:
             return 'Error: You do not have the requirements to buy this item.'
     else:
@@ -79,7 +83,7 @@ def buy(userid, item, number):
 def claim(userid, itemname, number):
     try:
         itemid = find_by_name(itemname)
-    except ValueError:
+    except KeyError:
         return f"Error: {itemname} is not an item."
 
     if not users.item_in_inventory(userid, itemid, number):
@@ -90,23 +94,26 @@ def claim(userid, itemname, number):
     if int(itemid) == 402:
         out += 'You have received:\n'
         gems = {
-            "25": 4,
-            "26": 16,
-            "27": 64,
-            "28": 128
+            25: 4,
+            26: 16,
+            27: 64,
+            28: 128,
+            463: 1024,
+            465: 2048
         }
         loot = []
         for _ in range(number):
-            for _ in range(4):
-                gem_type = random.randint(25, 28)
+            while True:
+                gem_type = random.choice(gems.keys(), 1)[0]
                 if random.randint(1, gems[gem_type]) == 1:
                     loot.append(gem_type)
+                    break
         users.update_inventory(userid, loot)
         loot_counter = Counter(loot)
-        for itemid in loot_counter.keys():
-            out += f'{loot_counter[itemid]} {add_plural(itemid)}\n'
+        for gemid in loot_counter.keys():
+            out += f'{loot_counter[gemid]} {add_plural(gemid)}\n'
         out += f'from your {add_plural(itemid)}.'
-
+        users.update_inventory(userid, number * [itemid], remove=True)
     else:
         out += f'{get_attr(itemid)} is not claimable.'
     return out
@@ -150,7 +157,9 @@ def drink(userid, name):
     if is_pot:
         if users.item_in_inventory(userid, itemid):
             users.update_inventory(userid, [itemid], remove=True)
-            users.update_user(userid, itemid, users.POTION_KEY)
+            equipment = users.read_user(userid, key=users.EQUIPMENT_KEY)
+            equipment['15'] = str(itemid)
+            users.update_user(userid, equipment, key=users.EQUIPMENT_KEY)
         else:
             return f"You do not have any {add_plural(itemid)} in your inventory."
     else:
@@ -180,6 +189,18 @@ def get_attr(itemid, key=NAME_KEY):
             return ITEMS[itemid][key]
     else:
         raise KeyError
+
+
+def get_luck_factor(userid):
+    """Gets the luck factor of a user."""
+    equipment = users.read_user(userid, key=users.EQUIPMENT_KEY)
+    luck_factor = 1
+    for itemid in equipment.values():
+        if int(itemid) > 0:
+            item_luck = get_attr(itemid, key=LUCK_KEY)
+            if item_luck > luck_factor:
+                luck_factor = item_luck
+    return luck_factor
 
 
 def is_tradable(itemid):
@@ -218,9 +239,9 @@ def sell(userid, item, number):
     if users.item_in_inventory(userid, itemid, number=number):
         value = get_attr(itemid, key=VALUE_KEY)
         users.update_inventory(userid, [itemid]*number, remove=True)
-        ac.update_account(userid, number * value)
+        users.update_inventory(userid, (number * value)*["0"])
         value_formatted = '{:,}'.format(value * number)
-        return f'{number} {item_name} sold for G${value_formatted}!'
+        return f'{number} {item_name} sold for {value_formatted} coins!'
     else:
         return f'Error: {item_name} not in inventory or you do not have at least {number} in your inventory.'
 
@@ -235,7 +256,7 @@ def print_shop(userid):
         if int(items[itemid]) in set(users.get_completed_quests(userid)) or items[itemid] == '0':
             name = get_attr(itemid)
             price = '{:,}'.format(4 * get_attr(itemid, key=VALUE_KEY))
-            out += f'**{name.title()}**: G${price}\n'
+            out += f'**{name.title()}**: {price} coins\n'
         if len(out) > 1800:
             messages.append(out)
             out = SHOP_HEADER
@@ -260,7 +281,7 @@ def print_stats(item):
 
     out = f'__**:moneybag: ITEMS :moneybag:**__\n'
     out += f'**Name**: {name}\n'
-    out += f'**Value**: G${value}\n'
+    out += f'**Value**: {value} gp\n'
     if slot > 0:
         out += f'**Damage**: {damage}\n'
         out += f'**Accuracy**: {accuracy}\n'

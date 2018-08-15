@@ -19,6 +19,7 @@ ACCURACY_KEY = 'accuracy'       # accuracy of monster
 DAMAGE_KEY = 'damage'           # damage of monster
 ARMOUR_KEY = 'armour'           # armour of monster
 SLAYER_KEY = 'slayer'           # boolean of whether monster is slayable
+BOSS_KEY = 'boss'               # boolean of wether monster is a boss
 DRAGON_KEY = 'dragon'           # boolean of whether monster has dragonfire
 QUEST_REQ_KEY = 'quest req'     # int representing questid needed to get this monster.
 
@@ -35,6 +36,7 @@ DEFAULT_MONSTER = {
     ARMOUR_KEY: 1,
     SLAYER_KEY: True,
     DRAGON_KEY: False,
+    BOSS_KEY: False,
     QUEST_REQ_KEY: 0
 }
 
@@ -245,11 +247,11 @@ def print_monster(monster):
     return messages
 
 
-def print_monster_kills(userid):
+def print_monster_kills(userid, name):
     """Prints the number of monsters a user has killed."""
     monster_kills = users.read_user(userid, key=users.MONSTERS_KEY)
 
-    out = f'{users.CHARACTER_HEADER}'
+    out = f"{users.CHARACTER_HEADER.replace('$NAME', name)}"
     for monsterid in sorted(list(monster_kills.keys())):
         if monster_kills[monsterid] > 0:
             out += f'**{get_attr(monsterid).title()}**: {monster_kills[monsterid]}\n'

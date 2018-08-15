@@ -1,4 +1,5 @@
 import math
+import datetime
 
 from subs.miniscape.files import XP_FACTOR
 from subs.miniscape import adventures as adv
@@ -169,26 +170,30 @@ def get_kill_result(person, *args):
     except ValueError as e:
         print(e)
         raise ValueError
-
     out = ''
     users.add_counter(person.id, monsterid, num_to_kill)
     if mon.get_attr(monsterid, key=mon.SLAYER_KEY):
         factor = 0.75
     else:
         factor = 1
+
+    factor *= items.get_luck_factor(person.id)
     loot = mon.get_loot(monsterid, int(num_to_kill), factor=factor)
     users.update_inventory(person.id, loot)
     out += print_loot(loot, person, monster_name, num_to_kill)
+
     xp_gained = mon.get_attr(monsterid, key=mon.XP_KEY) * int(num_to_kill)
     cb_level_before = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
     users.update_user(person.id, xp_gained, users.COMBAT_XP_KEY)
     cb_level_after = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
+
     combat_xp_formatted = '{:,}'.format(xp_gained)
     out += f'\nYou have also gained {combat_xp_formatted} combat xp'
     if cb_level_after > cb_level_before:
         out += f' and {cb_level_after - cb_level_before} combat levels'
     out += '.'
     users.remove_potion(person.id)
+
     return out
 
 
@@ -204,7 +209,7 @@ def get_result(person, *args):
     if adv.is_success(calc_chance(person.id, monsterid, num_to_kill)):
 
         users.remove_potion(person.id)
-        loot = mon.get_loot(monsterid, int(num_to_kill))
+        loot = mon.get_loot(monsterid, int(num_to_kill), factor=items.get_luck_factor(person.id))
         users.update_inventory(person.id, loot)
         out += print_loot(loot, person, monster_name, num_to_kill)
 
@@ -226,7 +231,69 @@ def get_result(person, *args):
     else:
         users.remove_potion(person.id)
         factor = int(chance)/100
+        factor *= items.get_luck_factor(person.id)
         loot = mon.get_loot(monsterid, int(num_to_kill), factor=factor)
+        users.update_inventory(person.id, loot)
+        out += print_loot(loot, person, monster_name, num_to_kill)
+
+        xp_gained = round(XP_FACTOR * mon.get_attr(monsterid, key=mon.XP_KEY) * int(num_to_kill) * factor)
+        cb_level_before = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
+        slay_level_before = users.xp_to_level(users.read_user(person.id, users.SLAYER_XP_KEY))
+        users.update_user(person.id, xp_gained, users.SLAYER_XP_KEY)
+        users.update_user(person.id, round(0.7 * xp_gained), users.COMBAT_XP_KEY)
+        cb_level_after = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
+        slay_level_after = users.xp_to_level(users.read_user(person.id, users.SLAYER_XP_KEY))
+
+        slayer_xp_formatted = '{:,}'.format(xp_gained)
+        combat_xp_formatted = '{:,}'.format(round(0.7 * xp_gained))
+        out += f'\nYou have received lower loot and experience because you have died.'\
+               f'\nYou have received {slayer_xp_formatted} slayer xp and {combat_xp_formatted} combat xp. '
+        if cb_level_after > cb_level_before:
+            out += f'In addition, you have gained {cb_level_after - cb_level_before} combat levels. '
+        if slay_level_after > slay_level_before:
+            out += f'Also, as well, you have gained {slay_level_after - slay_level_before} slayer levels. '
+
+    return out
+
+
+def get_reaper_result(person, *args):
+    """Determines the success and loot of a reaper task."""
+    try:
+        monsterid, monster_name, num_to_kill, chance = args[0]
+    except ValueError as e:
+        print(e)
+        raise ValueError
+    out = ''
+    users.add_counter(person.id, monsterid, num_to_kill)
+    if adv.is_success(calc_chance(person.id, monsterid, num_to_kill)):
+        users.remove_potion(person.id)
+        factor = 0.7 * items.get_luck_factor(person.id)
+        loot = mon.get_loot(monsterid, int(num_to_kill), factor=factor)
+        loot['291'] = 1
+        users.update_inventory(person.id, loot)
+        out += print_loot(loot, person, monster_name, num_to_kill)
+
+        xp_gained = XP_FACTOR * mon.get_attr(monsterid, key=mon.XP_KEY) * int(num_to_kill)
+        cb_level_before = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
+        slay_level_before = users.xp_to_level(users.read_user(person.id, users.SLAYER_XP_KEY))
+        users.update_user(person.id, xp_gained, users.SLAYER_XP_KEY)
+        users.update_user(person.id, round(0.7 * xp_gained), users.COMBAT_XP_KEY)
+        cb_level_after = users.xp_to_level(users.read_user(person.id, users.COMBAT_XP_KEY))
+        slay_level_after = users.xp_to_level(users.read_user(person.id, users.SLAYER_XP_KEY))
+
+        slayer_xp_formatted = '{:,}'.format(xp_gained)
+        combat_xp_formatted = '{:,}'.format(round(0.7 * xp_gained))
+        out += f'\nYou have also gained {slayer_xp_formatted} slayer xp and {combat_xp_formatted} combat xp. '
+        if cb_level_after > cb_level_before:
+            out += f'In addition, you have gained {cb_level_after - cb_level_before} combat levels. '
+        if slay_level_after > slay_level_before:
+            out += f'Also, as well, you have gained {slay_level_after - slay_level_before} slayer levels. '
+    else:
+
+        users.remove_potion(person.id)
+        factor = int(chance)/170 * items.get_luck_factor(person.id)
+        loot = mon.get_loot(monsterid, int(num_to_kill), factor=factor)
+        loot.append('291')
         users.update_inventory(person.id, loot)
         out += print_loot(loot, person, monster_name, num_to_kill)
 
@@ -289,6 +356,46 @@ def get_task(userid):
     else:
         out = adv.print_adventure(userid)
         out += adv.print_on_adventure_error('task')
+    return out
+
+
+def get_reaper_task(userid):
+    """Assigns a user a reaper task provided they are not in the middle of another adventure."""
+    out = SLAYER_HEADER
+    if users.get_level(userid, key=users.SLAYER_XP_KEY) < 50:
+        out += "Your slayer level is too low to start a reaper task. You need at least 50 slayer."
+        return out
+    print(users.read_user(userid, key=users.LAST_REAPER_KEY))
+    if datetime.datetime.fromtimestamp(users.read_user(userid, key=users.LAST_REAPER_KEY)).date() \
+            >= datetime.date.today():
+        out += 'You have already done a reaper task today. Please come back tomorrow for another one.'
+        return out
+
+    if not adv.is_on_adventure(userid):
+        completed_quests = set(users.get_completed_quests(userid))
+        for _ in range(1000):
+            monsterid = mon.get_random(slayer_level=users.xp_to_level(users.read_user(userid, key=users.SLAYER_XP_KEY)))
+            num_to_kill = mon.get_task_length(monsterid)
+            base_time, task_length = calc_length(userid, monsterid, num_to_kill)
+            chance = calc_chance(userid, monsterid, num_to_kill)
+            # print(f'{monsterid} {task_length/base_time} {chance}')
+            if 0.25 <= task_length / base_time <= 2 and chance >= 20 \
+                    and mon.get_attr(monsterid, key=mon.BOSS_KEY) is True\
+                    and ({mon.get_attr(monsterid, key=mon.QUEST_REQ_KEY)}.issubset(completed_quests)
+                    or mon.get_attr(monsterid, key=mon.QUEST_REQ_KEY) == 0):
+                break
+        else:
+            return "Error: gear too low to fight any monsters. Please equip some better gear and try again. " \
+                   "If you are new, type `~starter` to get a bronze kit."
+        monster_name = mon.get_attr(monsterid)
+        task = adv.format_line(5, userid, adv.get_finish_time(task_length), monsterid,
+                               monster_name, num_to_kill, chance)
+        adv.write(task)
+        users.update_user(userid, datetime.date.today(), key=users.LAST_REAPER_KEY)
+        out += print_task(userid, reaper=True)
+    else:
+        out = adv.print_adventure(userid)
+        out += adv.print_on_adventure_error('reaper task')
     return out
 
 
@@ -361,11 +468,23 @@ def print_status(time_left, *args):
     return out
 
 
-def print_task(userid):
+def print_reaper_status(time_left, *args):
+    monsterid, monster_name, num_to_kill, chance = args[0]
+    out = f'{SLAYER_HEADER}' \
+          f'You are currently on a reaper task of {num_to_kill} {mon.add_plural(monsterid)}. ' \
+          f'You can see the results of this slayer task {time_left}. ' \
+          f'You currently have a {chance}% chance of succeeding with your current gear. '
+    return out
+
+
+def print_task(userid, reaper=False):
     """Converts a user's task into a string."""
     taskid, userid, task_length, monsterid, monster_name, num_to_kill, chance = get_task_info(userid)
-
-    out = f'New Slayer task received: Kill __{num_to_kill} {mon.add_plural(monsterid)}__!\n'
+    if reaper:
+        out = f'New reaper task received: '
+    else:
+        out = f'New slayer task received: '
+    out += f'Kill __{num_to_kill} {mon.add_plural(monsterid)}__!\n'
     out += f'This will take {task_length} minutes '
     out += f'and has a success rate of {chance}% with your current gear. '
     return out

@@ -1,5 +1,6 @@
 import math
 import ujson
+import random
 from collections import Counter
 
 from subs.miniscape import adventures as adv
@@ -38,22 +39,29 @@ def craft(userid, recipe, n=1):
                f'higher than your artisan level ({artisan_level}).'
 
     inputs = get_attr(recipeid)
-    loot = []
+    recipe_input = []
     for itemid in list(inputs.keys()):
         if users.item_in_inventory(userid, itemid, number=n * inputs[itemid]):
-            loot.extend((n * inputs[itemid]) * [itemid])
+            recipe_input.extend((n * inputs[itemid]) * [itemid])
         else:
             return f'Error: you do not have enough items to make {n} {items.add_plural(recipeid)} ' \
                    f'({n * inputs[itemid]} {items.add_plural(itemid)}).'
+    bonus = 0
+    if artisan_level == 99:
+        for _ in range(n):
+            if random.randint(1, 20) == 1:
+                bonus += 1
 
-    users.update_inventory(userid, loot, remove=True)
-    users.update_inventory(userid, n * [recipeid])
+    users.update_inventory(userid, recipe_input, remove=True)
+    users.update_inventory(userid, (n + bonus) * [recipeid])
     xp = XP_FACTOR * n * items.get_attr(recipeid, key=items.XP_KEY)
     users.update_user(userid, xp, key=users.ARTISAN_XP_KEY)
     level_after = users.xp_to_level(users.read_user(userid, users.ARTISAN_XP_KEY))
 
     xp_formatted = '{:,}'.format(xp)
     out = f'Successfully crafted {n} {items.add_plural(recipeid)}! You have also gained {xp_formatted} artisan xp! '
+    if bonus > 0:
+        out += f'Due to your 99 artisan perk, you have also created an extra {bonus} {items.add_plural(recipeid)}! '
     if level_after > artisan_level:
         out += f'You have also gained {level_after - artisan_level} artisan levels!'
     return out
@@ -66,13 +74,13 @@ def calc_length(userid, itemid, number):
     item_level = items.get_attr(itemid, key=items.LEVEL_KEY)
     equipment = users.read_user(userid, key=users.EQUIPMENT_KEY)
     if items.get_attr(itemid, key=items.TREE_KEY):
-        if int(equipment[13]) > -1:
-            item_multiplier = 2 - (items.get_attr(equipment[13], key=items.LEVEL_KEY) / 100)
+        if int(equipment['13']) > -1:
+            item_multiplier = 2 - (items.get_attr(equipment['13'], key=items.LEVEL_KEY) / 100)
         else:
             item_multiplier = 10
     elif items.get_attr(itemid, key=items.TREE_KEY):
-        if int(equipment[14]) > -1:
-            item_multiplier = 2 - (items.get_attr(equipment[14], key=items.LEVEL_KEY) / 100)
+        if int(equipment['14']) > -1:
+            item_multiplier = 2 - (items.get_attr(equipment['14'], key=items.LEVEL_KEY) / 100)
         else:
             item_multiplier = 10
     else:
@@ -91,13 +99,13 @@ def calc_number(userid, itemid, time):
     item_level = items.get_attr(itemid, key=items.LEVEL_KEY)
     equipment = users.read_user(userid, key=users.EQUIPMENT_KEY)
     if items.TREE_KEY:
-        if int(equipment[13]) > -1:
-            item_multiplier = 2 - (items.get_attr(equipment[13], key=items.LEVEL_KEY) / 100)
+        if int(equipment['13']) > -1:
+            item_multiplier = 2 - (items.get_attr(equipment['13'], key=items.LEVEL_KEY) / 100)
         else:
             item_multiplier = 10
     elif items.ROCK_KEY:
-        if int(equipment[14]) > -1:
-            item_multiplier = 2 - (items.get_attr(equipment[14], key=items.LEVEL_KEY) / 100)
+        if int(equipment['14']) > -1:
+            item_multiplier = 2 - (items.get_attr(equipment['14'], key=items.LEVEL_KEY) / 100)
         else:
             item_multiplier = 10
     else:
@@ -223,18 +231,22 @@ def start_gather(userid, item, length=-1, number=-1):
         gather_requirement = items.get_attr(itemid, key=items.LEVEL_KEY)
         player_potion = users.read_user(userid, key=users.EQUIPMENT_KEY)['15']
         if player_potion == '435':
-            gather_level = gather_level + 3
+            boosted_level = gather_level + 3
         if player_potion == '436':
-            gather_level = gather_level + 6
+            boosted_level = gather_level + 6
+        else:
+            boosted_level = gather_level
 
-        if gather_level < gather_requirement:
+        if boosted_level < gather_requirement:
             return f'Error: {item_name} has a gathering requirement ({gather_requirement}) higher ' \
                    f'than your gathering level ({gather_level})'
         quest_req = items.get_attr(itemid, key=items.QUEST_KEY)
         if quest_req not in set(users.get_completed_quests(userid)) and quest_req > 0:
             return f'Error: You do not have the required quest to gather this item.'
 
-        if number > 500:
+        if number > 1000 and gather_level == 99:
+            number = 1000
+        if number > 500 and gather_level < 99:
             number = 500
         if length > 180:
             length = 180

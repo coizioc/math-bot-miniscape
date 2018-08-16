@@ -9,6 +9,8 @@ with open(MONSTERS_JSON, 'r') as f:
     MONSTERS = ujson.load(f)
 
 NAME_KEY = 'name'               # name of the monster
+PLURAL_KEY = 'plural'           # string containing how to pluralise a monster's name.
+NICK_KEY = 'nick'               # list of accepted alternative names for a monster.
 TASK_MIN_KEY = 'task_min'       # min num. of monsters that can be assigned per task
 TASK_MAX_KEY = 'task_max'       # max num. of monsters that can be assigned per task
 XP_KEY = 'xp'                   # xp per monster kill
@@ -25,6 +27,8 @@ QUEST_REQ_KEY = 'quest req'     # int representing questid needed to get this mo
 
 DEFAULT_MONSTER = {
     NAME_KEY: 'unknown mosnter',
+    PLURAL_KEY: 's',
+    NICK_KEY: [],
     TASK_MIN_KEY: 1,
     TASK_MAX_KEY: 1,
     XP_KEY: 0,
@@ -51,8 +55,16 @@ RARITY_NAMES = {
     }
 
 
-def add_plural(monsterid):
-    return get_attr(monsterid) + 's'
+def add_plural(number, monsterid):
+    if int(number) > 0:
+        out = f'{number} {get_attr(monsterid)}'
+    else:
+        out = f'{get_attr(monsterid)}'
+    if int(number) != 1:
+        suffix = get_attr(monsterid, key=PLURAL_KEY)
+        for c in suffix:
+            out = out[:-1] if c == '_' else out + c
+    return out
 
 
 def find_by_name(name):
@@ -60,6 +72,10 @@ def find_by_name(name):
     name = name.lower()
     for monsterid in list(MONSTERS.keys()):
         if name == MONSTERS[monsterid][NAME_KEY]:
+            return monsterid
+        if name == add_plural(0, monsterid):
+            return monsterid
+        if any([name == nick for nick in get_attr(monsterid, key=NICK_KEY)]):
             return monsterid
     else:
         raise KeyError
@@ -211,14 +227,20 @@ def print_monster(monster):
 
     messages = []
 
+    aliases = ', '.join(get_attr(monsterid, key=NICK_KEY))
+
     out = f'__**:skull_crossbones: BESTIARY :skull_crossbones:**__\n'\
-          f'**Name**: {MONSTERS[monsterid][NAME_KEY].title()}\n'\
-          f'**Level**: {MONSTERS[monsterid][LEVEL_KEY]}\n'\
-          f'**Accuracy**: {MONSTERS[monsterid][ACCURACY_KEY]}\n'\
-          f'**Damage**: {MONSTERS[monsterid][DAMAGE_KEY]}\n'\
-          f'**Armour**: {MONSTERS[monsterid][ARMOUR_KEY]}\n'\
-          f'**XP**: {MONSTERS[monsterid][XP_KEY]}\n\n'\
-          f'**Loot Table**:\n'
+          f'**Name**: {MONSTERS[monsterid][NAME_KEY].title()}\n'
+
+    if len(aliases) > 0:
+        out += f'**Aliases**: {aliases}\n'\
+
+    out += f'**Level**: {MONSTERS[monsterid][LEVEL_KEY]}\n'\
+           f'**Accuracy**: {MONSTERS[monsterid][ACCURACY_KEY]}\n'\
+           f'**Damage**: {MONSTERS[monsterid][DAMAGE_KEY]}\n'\
+           f'**Armour**: {MONSTERS[monsterid][ARMOUR_KEY]}\n'\
+           f'**XP**: {MONSTERS[monsterid][XP_KEY]}\n\n'\
+           f'**Loot Table**:\n'
 
     loottable = get_loot_table(monsterid)
 

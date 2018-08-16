@@ -12,6 +12,7 @@ with open(ITEM_JSON, 'r', encoding='utf-8-sig') as f:
     ITEMS = ujson.load(f)
 
 NAME_KEY = 'name'           # Name of the item
+PLURAL_KEY = 'plural'       # string containing how to pluralise an item's name.
 VALUE_KEY = 'value'         # High alch value of the item
 DAMAGE_KEY = 'damage'       # Damage stat of the item
 ACCURACY_KEY = 'accuracy'   # Accuracy stat of the item
@@ -26,8 +27,11 @@ TREE_KEY = 'tree'           # Boolean whether gatherable is a tree.
 ROCK_KEY = 'rock'           # Boolean whether gatherable is a rock.
 FISH_KEY = 'fish'           # Boolean whether gatherable is a fish.
 POT_KEY = 'potion'          # Boolean whether consumable is a potion.
+COOK_KEY = 'cook'           # Boolean whether item can be cooked.
+EAT_KEY = 'eat'             # Int representing chance improvement by item when set as food.
 LUCK_KEY = 'luck'           # float representing factor of luck enhancement
 DEFAULT_ITEM = {NAME_KEY: 'unknown item',
+                PLURAL_KEY: 's',
                 VALUE_KEY: 0,
                 DAMAGE_KEY: 0,
                 ACCURACY_KEY: 0,
@@ -42,14 +46,24 @@ DEFAULT_ITEM = {NAME_KEY: 'unknown item',
                 ROCK_KEY: False,
                 FISH_KEY: False,
                 POT_KEY: False,
+                COOK_KEY: False,
+                EAT_KEY: 0,
                 LUCK_KEY: 1
                 }
 
 SHOP_HEADER = '__**:moneybag: SHOP :moneybag:**__\n'
 
 
-def add_plural(itemid):
-    return get_attr(itemid) + 's'
+def add_plural(number, itemid):
+    if int(number) > 0:
+        out = f'{number} {get_attr(itemid)}'
+    else:
+        out = f'{get_attr(itemid)}'
+    if int(number) != 1:
+        suffix = get_attr(itemid, key=PLURAL_KEY)
+        for c in suffix:
+            out = out[:-1] if c == '_' else out + c
+    return out
 
 
 def buy(userid, item, number):
@@ -87,7 +101,7 @@ def claim(userid, itemname, number):
         return f"Error: {itemname} is not an item."
 
     if not users.item_in_inventory(userid, itemid, number):
-        return f'You do not have {number} {add_plural(itemid)} in your inventory.'
+        return f'You do not have {add_plural(number, itemid)} in your inventory.'
 
     out = '__**CLAIM**__ :moneybag:\n'
 
@@ -111,8 +125,8 @@ def claim(userid, itemname, number):
         users.update_inventory(userid, loot)
         loot_counter = Counter(loot)
         for gemid in loot_counter.keys():
-            out += f'{loot_counter[gemid]} {add_plural(gemid)}\n'
-        out += f'from your {add_plural(itemid)}.'
+            out += f'{add_plural(loot_counter[gemid], gemid)}\n'
+        out += f'from your {add_plural(number, itemid)}.'
         users.update_inventory(userid, number * [itemid], remove=True)
     else:
         out += f'{get_attr(itemid)} is not claimable.'
@@ -161,7 +175,7 @@ def drink(userid, name):
             equipment['15'] = str(itemid)
             users.update_user(userid, equipment, key=users.EQUIPMENT_KEY)
         else:
-            return f"You do not have any {add_plural(itemid)} in your inventory."
+            return f"You do not have any {add_plural(0, itemid)} in your inventory."
     else:
         return f"{item_name} isn't a potion!"
 

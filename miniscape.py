@@ -17,6 +17,7 @@ from subs.miniscape import quests
 from subs.miniscape import slayer
 from subs.miniscape import users
 from subs.miniscape import clues
+from subs.miniscape import quiz
 
 RESOURCES_DIRECTORY = f'./subs/miniscape/resources/'
 
@@ -28,6 +29,10 @@ ADVENTURES_CHANNEL = 478967314101043200
 BANK_CHANNEL = 478967336653815835
 SHOP_CHANNEL = 478967877517443073
 DUEL_CHANNEL = 479056789330067457
+JEOPARDY_CHANNEL = 479694071191961617
+MINISCAPE_1_CHANNEL = 479668572344287238
+MINISCAPE_2_CHANNEL = 479663988154695684
+GENERAL_CHANNELS = [MINISCAPE_1_CHANNEL, MINISCAPE_2_CHANNEL]
 
 
 class AmbiguousInputError(Exception):
@@ -69,6 +74,8 @@ def get_display_name(member):
         name = member.name
     else:
         name = member.nick
+    if users.read_user(member.id, key=users.IRONMAN_KEY):
+        name += ' (IM)'
     return name
 
 
@@ -109,27 +116,27 @@ class Miniscape():
     @commands.group(invoke_without_command=True)
     async def me(self, ctx):
         """Shows information related to the user."""
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             name = get_display_name(ctx.author)
             await ctx.send(users.print_account(ctx.author.id, name))
 
-    @me.group(name='stats')
+    @me.group(name='stats', aliases=['levels'])
     async def _stats(self, ctx):
         """Shows the levels and stats of a user."""
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             name = get_display_name(ctx.author)
             await ctx.send(users.print_account(ctx.author.id, name, printequipment=False))
 
-    @me.group(name='equipment')
+    @me.group(name='equipment', aliases=['armour', 'armor'])
     async def _equipment(self, ctx):
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             name = get_display_name(ctx.author)
             await ctx.send(users.print_equipment(ctx.author.id, name=name, with_header=True))
 
     @me.group(name='monsters')
     async def _monsters(self, ctx):
         """Shows how many monsters a user has killed."""
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             name = get_display_name(ctx.author)
             out = mon.print_monster_kills(ctx.author.id, name)
             await ctx.send(out)
@@ -137,14 +144,14 @@ class Miniscape():
     @me.command(name='clues')
     async def _clues(self, ctx):
         """Shows how many clue scrolls a user has completed."""
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             out = clues.print_clue_scrolls(ctx.author.id)
             await ctx.send(out)
 
     @commands.command(aliases=['lookup', 'finger', 'find'])
     async def examine(self, ctx, *args):
         """Examines a given user."""
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             search_string = ' '.join(args).lower()
             for member in ctx.guild.members:
                 if member.nick is not None:
@@ -163,7 +170,7 @@ class Miniscape():
     @commands.command()
     async def equip(self, ctx, *args):
         """Equips an item from a user's inventory."""
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             item = ' '.join(args)
             out = users.equip_item(ctx.author.id, item.lower())
             await ctx.send(out)
@@ -171,7 +178,7 @@ class Miniscape():
     @commands.command()
     async def unequip(self, ctx, *args):
         """Unequips an item from a user's equipment."""
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             item = ' '.join(args)
             out = users.unequip_item(ctx.author.id, item.lower())
             await ctx.send(out)
@@ -179,7 +186,7 @@ class Miniscape():
     @commands.group(aliases=['invent', 'inventory', 'item'], invoke_without_command=True)
     async def items(self, ctx, search=''):
         """Show's the player's inventory."""
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id in [BANK_CHANNEL, SHOP_CHANNEL] or ctx.channel.id in GENERAL_CHANNELS:
             inventory = users.print_inventory(ctx.author, search.lower())
             count = 1
             for message in inventory:
@@ -190,28 +197,28 @@ class Miniscape():
     @items.command(name='info')
     async def _item_info(self, ctx, *args):
         item = ' '.join(args)
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             out = items.print_stats(item)
             await ctx.send(out)
 
     @commands.command()
     async def slayer(self, ctx):
         """Gives the user a slayer task."""
-        if ctx.channel.id == ADVENTURES_CHANNEL:
+        if ctx.channel.id == ADVENTURES_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             out = slayer.get_task(ctx.author.id)
             await ctx.send(out)
 
     @commands.command()
     async def reaper(self, ctx):
         """Gives the user a reaper task."""
-        if ctx.channel.id == ADVENTURES_CHANNEL:
+        if ctx.channel.id == ADVENTURES_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             out = slayer.get_reaper_task(ctx.author.id)
             await ctx.send(out)
 
     @commands.group(invoke_without_command=True, aliases=['grind', 'fring'])
     async def kill(self, ctx, *args):
         """Lets the user kill monsters for a certain number or a certain amount of time."""
-        if ctx.channel.id == ADVENTURES_CHANNEL:
+        if ctx.channel.id == ADVENTURES_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             if len(args) > 0:
                 monster = ''
                 if args[0].isdigit():
@@ -242,21 +249,21 @@ class Miniscape():
     @commands.command(aliases=['starter'])
     async def starter_gear(self, ctx):
         """Gives the user a set of bronze armour."""
-        if ctx.channel.id == SHOP_CHANNEL or ctx.channel.id == ADVENTURES_CHANNEL:
+        if ctx.channel.id == SHOP_CHANNEL or ctx.channel.id == ADVENTURES_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             name = get_display_name(ctx.author)
             if users.read_user(ctx.author.id, key=users.COMBAT_XP_KEY) == 0:
                 users.update_inventory(ctx.author.id, [63, 66, 69, 70, 64, 72])
 
-                await ctx.send(f'Bronze set given to {name}! You can see your items by typing `~inventory` '
+                await ctx.send(f'Bronze set given to {name}! You can see your items by typing `~inventory` in #bank '
                                f'and equip them by typing `~equip [item]`. You can see your current stats by typing '
-                               f'`~me`.')
+                               f'`~me`. If you need help with commands, feel free to look at #welcome or ask around!')
             else:
                 await ctx.send(f'You are too experienced to get the starter gear, {name}.')
 
     @commands.command(aliases=['bes', 'monsters'])
     async def bestiary(self, ctx, *args):
         """Shows a list of monsters and information related to those monsters."""
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             monster = ' '.join(args)
             if monster == '':
                 messages = mon.print_list()
@@ -278,14 +285,15 @@ class Miniscape():
 
     @commands.command()
     async def claim(self, ctx, *args):
-        if args[0].isdigit():
-            number = int(args[0])
-            item = ' '.join(args[1:])
-        else:
-            number = 1
-            item = ' '.join(args)
-        out = items.claim(ctx.author.id, item, number)
-        await ctx.send(out)
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
+            if args[0].isdigit():
+                number = int(args[0])
+                item = ' '.join(args[1:])
+            else:
+                number = 1
+                item = ' '.join(args)
+            out = items.claim(ctx.author.id, item, number)
+            await ctx.send(out)
 
     @commands.command()
     async def cancel(self, ctx):
@@ -326,14 +334,14 @@ class Miniscape():
     @commands.command()
     async def compare(self, ctx, item1, item2):
         """Compares the stats of two items."""
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             out = items.compare(item1.lower(), item2.lower())
             await ctx.send(out)
 
     @commands.command()
     async def status(self, ctx):
         """Says what you are currently doing."""
-        if ctx.channel.id == ADVENTURES_CHANNEL:
+        if ctx.channel.id == ADVENTURES_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             if adv.is_on_adventure(ctx.author.id):
                 out = adv.print_adventure(ctx.author.id)
             else:
@@ -343,7 +351,7 @@ class Miniscape():
     @commands.group(aliases=['clues'], invoke_without_command=True)
     async def clue(self, ctx, difficulty):
         """Starts a clue scroll."""
-        if ctx.channel.id == ADVENTURES_CHANNEL:
+        if ctx.channel.id == ADVENTURES_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             if not difficulty.isdigit():
                 difficulty_names = {
                     'easy': 1,
@@ -369,7 +377,7 @@ class Miniscape():
     @commands.command(aliases=['drank', 'chug', 'suckle'])
     async def drink(self, ctx, *args):
         """Drinks a potion."""
-        if ctx.channel.id in {BANK_CHANNEL, ADVENTURES_CHANNEL}:
+        if ctx.channel.id in {BANK_CHANNEL, ADVENTURES_CHANNEL} or ctx.channel.id in GENERAL_CHANNELS:
             name = ' '.join(args)
             out = items.drink(ctx.author.id, name)
             await ctx.send(out)
@@ -377,15 +385,15 @@ class Miniscape():
     @commands.group(invoke_without_command=True)
     async def shop(self, ctx):
         """Shows the items available at the shop."""
-        if ctx.channel.id == SHOP_CHANNEL:
+        if ctx.channel.id == SHOP_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             messages = items.print_shop(ctx.author.id)
             for message in messages:
                 await ctx.send(message)
 
-    @shop.command(name='buy')
-    async def _buy(self, ctx, *args):
+    @commands.command()
+    async def buy(self, ctx, *args):
         """Buys something from the shop."""
-        if ctx.channel.id == SHOP_CHANNEL:
+        if ctx.channel.id == SHOP_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             if len(args) > 0:
                 if args[0].isdigit():
                     number = int(args[0])
@@ -396,10 +404,10 @@ class Miniscape():
                 out = items.buy(ctx.author.id, item, number=number)
                 await ctx.send(out)
 
-    @shop.command(name='sell')
-    async def _sell(self, ctx, *args):
+    @commands.command()
+    async def sell(self, ctx, *args):
         """Sells the player's inventory for GasterCoin."""
-        if ctx.channel.id == SHOP_CHANNEL:
+        if ctx.channel.id == SHOP_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             try:
                 number = int(args[0])
                 item = ' '.join(args[1:])
@@ -409,10 +417,10 @@ class Miniscape():
             out = items.sell(ctx.author.id, item, number=number)
             await ctx.send(out)
 
-    @shop.command(name='sellall')
-    async def _sellall(self, ctx, maxvalue=None):
+    @commands.command()
+    async def sellall(self, ctx, maxvalue=None):
         """Sells all items in the player's inventory (below a certain value) for GasterCoin."""
-        if ctx.channel.id == SHOP_CHANNEL:
+        if ctx.channel.id == SHOP_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             inventory = users.read_user(ctx.author.id, key=users.ITEMS_KEY)
             name = get_display_name(ctx.author)
             if maxvalue is None:
@@ -433,16 +441,16 @@ class Miniscape():
                       f"sold for {value_formatted} coins!"
             await ctx.send(out)
 
-    @shop.command(name='trade')
-    async def _trade(self, ctx, *args):
+    @commands.command()
+    async def trade(self, ctx, *args):
         """Trades to a person a number of a given object for a given price."""
-        if ctx.channel.id == SHOP_CHANNEL:
+        if ctx.channel.id == SHOP_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             if users.read_user(ctx.author.id, key=users.IRONMAN_KEY):
                 await ctx.send('Ironmen cannot trade.')
                 return
 
             if len(args) < 4:
-                await ctx.send('Error: args missing. Syntax is `~shop trade [name] [number] [item] [offer]`.')
+                await ctx.send('Arguments missing. Syntax is `~trade [name] [number] [item] [offer]`.')
                 return
 
             name = args[0]
@@ -474,20 +482,21 @@ class Miniscape():
                 return
 
             if not users.item_in_inventory(ctx.author.id, itemid, number):
-                await ctx.send(f'You do not have {number} {items.add_plural(itemid)} in your inventory.')
+                await ctx.send(f'You do not have {items.add_plural(number, itemid)} in your inventory.')
                 return
 
             if not items.is_tradable(itemid):
                 await ctx.send(f'You can not trade this item. ({items.get_attr(itemid)})')
                 return
-            if not users.item_in_inventory(ctx.author.id, "0", offer):
-                await ctx.send('You do not have enough gold to buy this many items.')
+
+            if not users.item_in_inventory(name_member.id, "0", offer):
+                await ctx.send(f'{get_display_name(name_member)} does not have enough gold to buy this many items.')
                 return
 
             name = get_display_name(ctx.author)
             offer_formatted = '{:,}'.format(offer)
-            out = f'{items.SHOP_HEADER}{name.title()} wants to sell {name_member.mention} {number} ' \
-                  f'{items.add_plural(itemid)} for {offer_formatted} coins. To accept this offer, reply ' \
+            out = f'{items.SHOP_HEADER}{name.title()} wants to sell {name_member.mention} ' \
+                  f'{items.add_plural(number, itemid)} for {offer_formatted} coins. To accept this offer, reply ' \
                   f'to this post with a :thumbsup:. Otherwise, this offer will expire in one minute.'
             msg = await ctx.send(out)
             await msg.add_reaction('\N{THUMBS UP SIGN}')
@@ -504,8 +513,9 @@ class Miniscape():
                         users.update_inventory(name_member.id, loot)
 
                         buyer_name = get_display_name(name_member)
-                        await ctx.send(f'{items.SHOP_HEADER}{name.title()} successfully sold {number} '
-                                       f'{items.add_plural(itemid)} to {buyer_name} for {offer_formatted} coins!')
+                        await ctx.send(f'{items.SHOP_HEADER}{name.title()} successfully sold '
+                                       f'{items.add_plural(number, itemid)} to {buyer_name} for '
+                                       f'{offer_formatted} coins!')
                         return
                 except asyncio.TimeoutError:
                     await msg.edit(content=f'One minute has passed and your offer has been cancelled.')
@@ -516,7 +526,7 @@ class Miniscape():
         """Lets a user become an ironman, by the way."""
         out = ':tools: __**IRONMAN**__ :tools:\n' \
               'If you want to become an ironman, please react to this post with a :thumbsup:. ' \
-              'This will __**RESET**__ your account and give you the ironman role. ' \
+              'This will **RESET** your account and give you the ironman role. ' \
               'You will be unable to trade with other players or gamble. ' \
               'In return, you will be able to proudly display your status as an ironman, by the way.'
         msg = await ctx.send(out)
@@ -525,7 +535,7 @@ class Miniscape():
         while True:
             try:
                 reaction, user = await self.bot.wait_for('reaction_add', timeout=60)
-                if str(reaction.emoji) == '👍' and user == ctx.author:
+                if str(reaction.emoji) == '👍' and user == ctx.author and reaction.message.id == msg.id:
                     users.reset_account(ctx.author.id)
                     users.update_user(ctx.author.id, True, key=users.IRONMAN_KEY)
                     ironman_role = discord.utils.get(ctx.guild.roles, name="Ironman")
@@ -538,10 +548,9 @@ class Miniscape():
                 await msg.edit(content=f'Your request has timed out. Please retype the command to try again.')
                 return
 
-
     @commands.group(invoke_without_command=True, aliases=['quest'])
     async def quests(self, ctx, questid=None):
-        if ctx.channel.id == ADVENTURES_CHANNEL:
+        if ctx.channel.id == ADVENTURES_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             if questid is not None:
                 out = quests.print_details(ctx.author.id, questid)
             else:
@@ -551,14 +560,14 @@ class Miniscape():
     @quests.command(name='start')
     async def _start(self, ctx, questid):
         """lets a user start a quest."""
-        if ctx.channel.id == ADVENTURES_CHANNEL:
+        if ctx.channel.id == ADVENTURES_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             out = quests.start_quest(ctx.author.id, questid)
             await ctx.send(out)
 
     @commands.command()
     async def gather(self, ctx, *args):
         """Gathers items."""
-        if ctx.channel.id == ADVENTURES_CHANNEL:
+        if ctx.channel.id == ADVENTURES_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             if len(args) > 0:
                 if args[0].isdigit():
                     number = args[0]
@@ -581,7 +590,7 @@ class Miniscape():
     @commands.group(invoke_without_command=True, aliases=['recipe'])
     async def recipes(self, ctx):
         """Prints a list of recipes a user can create."""
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             messages = craft.print_list(ctx.author.id)
             for message in messages:
                 await ctx.send(message)
@@ -589,14 +598,14 @@ class Miniscape():
     @recipes.command(name='info')
     async def _recipe_info(self, ctx, *args):
         """Lists the details of a particular recipe."""
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             recipe = ' '.join(args)
             out = craft.print_recipe(ctx.author.id, recipe)
             await ctx.send(out)
 
     @commands.command()
     async def craft(self, ctx, *args):
-        if ctx.channel.id == BANK_CHANNEL:
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             try:
                 number = int(args[0])
                 recipe = ' '.join(args[1:])
@@ -606,40 +615,55 @@ class Miniscape():
             out = craft.craft(ctx.author.id, recipe, n=number)
             await ctx.send(out)
 
-    # @commands.group(aliases=['nq', 'jeo'], invoke_without_command=True)
-    # async def jeopardy(self, ctx, textonly='f'):
-    #     """Gives users GasterCash in exchange for correct answers."""
-    #     if ctx.channel.id == JEOPARDY_CHANNEL:
-    #         question_args = quiz.get_new_question()
-    #         category = question_args[0]
-    #         value = question_args[1]
-    #         question = question_args[2]
-    #         answer = question_args[3]
-    #
-    #         if textonly != 't':
-    #             quiz.draw_jeopardy(question)
-    #             await ctx.send(f"*{ctx.author.name}: I'll take {category} for G${value}, Alex.*",
-    #                            file=discord.File(quiz.OUT_FILE))
-    #         else:
-    #             await ctx.send(f"*{ctx.author.name}: I'll take {category} for G${value}, Alex.*\n{question}")
-    #
-    #         while True:
-    #             message = await self.bot.wait_for('message')
-    #             if message.author == ctx.author:
-    #                 if message.content.lower() in answer.lower() and len(message.content) > 1:
-    #                     amount_formatted = '{:,}'.format(value)
-    #                     ac.update_account(ctx.author.id, value)
-    #                     await ctx.send(f"Answer {answer} is correct! "
-    #                                    f"{ctx.author.name}'s balance has increased by G${amount_formatted}!")
-    #                     break
-    #                 else:
-    #                     await ctx.send(f"Answer {message.content} is incorrect. Correct answer was {answer}.")
-    #                     break
+    @commands.command(aliases=['cock', 'fry', 'grill', 'saute', 'boil'])
+    async def cook(self, ctx, *args):
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
+            try:
+                number = int(args[0])
+                food = ' '.join(args[1:])
+            except ValueError:
+                number = 1
+                food = ' '.join(args)
+            out = craft.cook(ctx.author.id, food, n=number)
+            await ctx.send(out)
+
+    @commands.group(aliases=['nq', 'jeo'], invoke_without_command=True)
+    async def jeopardy(self, ctx, textonly='f'):
+        """Gives users GasterCash in exchange for correct answers."""
+        if ctx.channel.id == JEOPARDY_CHANNEL:
+            question_args = quiz.get_new_question()
+            category = question_args[0]
+            value = question_args[1]
+            question = question_args[2]
+            answer = question_args[3]
+
+            if textonly != 't':
+                quiz.draw_jeopardy(question)
+                await ctx.send(f"*{ctx.author.name}: I'll take {category} for {value} coins, Alex.*",
+                               file=discord.File(quiz.OUT_FILE))
+            else:
+                await ctx.send(f"*{ctx.author.name}: I'll take {category} for {value} coins, Alex.*\n{question}")
+
+            while True:
+                message = await self.bot.wait_for('message')
+                if message.author == ctx.author:
+                    if message.content.lower() in answer.lower() and len(message.content) > 1:
+                        amount_formatted = '{:,}'.format(value)
+
+                        out = f"Answer {answer} is correct! "
+                        if not users.read_user(ctx.author.id, key=users.IRONMAN_KEY):
+                            users.update_inventory(ctx.author.id, value * ['0'])
+                            out += f"{ctx.author.name}'s balance has increased by {amount_formatted} coins!"
+                        await ctx.send(out)
+                        break
+                    else:
+                        await ctx.send(f"Answer {message.content} is incorrect. Correct answer was {answer}.")
+                        break
 
     @commands.group(aliases=['dm'], invoke_without_command=True)
     async def deathmatch(self, ctx, opponent='rand', bet=None):
         """Allows users to duke it out in a 1v1 match."""
-        if ctx.channel.id == DUEL_CHANNEL:
+        if ctx.channel.id == DUEL_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             author_name = get_display_name(ctx.author)
             if bet is not None:
                 if users.read_user(ctx.author.id, key=users.IRONMAN_KEY):
@@ -671,7 +695,7 @@ class Miniscape():
                     return
                 users.update_inventory(ctx.author.id, bet*['0'], remove=True)
                 out = f'Deathmatch set up between {author_name} and {opponent_member.mention} with bet ' \
-                      f'G${bet_formatted}! To confirm this match, {opponent_name} must react to ' \
+                      f'{bet_formatted} coins! To confirm this match, {opponent_name} must react to ' \
                       f'this message with a :thumbsup: in the next minute. If a minute passes or if the ' \
                       f'challenger reacts to this message, the deathmatch will be cancelled and the deposit ' \
                       f'refunded.'
@@ -719,32 +743,90 @@ class Miniscape():
     async def balance(self, ctx, name=None):
         """Checks the user's balance."""
         if name is None:
-            amount = '{:,}'.format(ac.read_account(ctx.author.id))
-            await ctx.send(f'{ctx.author.name} has G${amount}')
+            amount = '{:,}'.format(users.get_coins_in_inventory(ctx.author.id))
+            name = get_display_name(ctx.author)
+            await ctx.send(f'{name} has {amount} coins')
         elif name == 'universe':
             await ctx.send('As all things should be.')
         else:
             try:
                 person_member = parse_name(ctx.message.guild, name)
-                amount = '{:,}'.format(ac.read_account(person_member.id))
-                await ctx.send(f'{person_member.name} has G${amount}')
+                name = get_display_name(person_member)
+                amount = '{:,}'.format(users.get_coins_in_inventory(ctx.author.id))
+                await ctx.send(f'{name} has {amount} coins')
             except NameError:
-                await ctx.send(f'Error: {name} not found in server.')
+                await ctx.send(f'Name {name} not found in server.')
             except AmbiguousInputError as members:
-                await ctx.send(f'Error: input {name} can refer to multiple people ({members})')
+                await ctx.send(f'Input {name} can refer to multiple people ({members})')
 
     @commands.command(aliases=['leaderboards'])
-    async def leaderboard(self, ctx, name=None):
-        """Allows users to easily compare each others' balances."""
-        if ctx.channel.id == BANK_CHANNEL:
-            leaderboard = ac.get_balances_by_amount()
-            out = '__**GasterCoin Leaderboard**__:\n'
+    async def leaderboard(self, ctx, *args):
+        """Allows users to easily compare each others' stats."""
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
+            if len(args) == 0:
+                name = None
+                key = 'total'
+            elif len(args) == 1:
+                if 'key=' in args[0]:
+                    name = None
+                    for userkey in users.DEFAULT_ACCOUNT.keys():
+                        if args[0][4:] in userkey:
+                            key = userkey
+                            break
+                    else:
+                        if args[0][4:] == 'total':
+                            key = 'total'
+                        else:
+                            await ctx.send(f'Key {args[0]} not found.')
+                            return
+
+                else:
+                    name = args[0]
+                    key = 'total'
+            else:
+                key = args[0]
+                if key not in users.DEFAULT_ACCOUNT.keys():
+                    if key != 'total':
+                        await ctx.send(f'Key {key} not found.')
+                        return
+                name = ' '.join(args[1:])
+
+            key_name = {
+                users.ITEMS_KEY: 'gold',
+                users.SLAYER_XP_KEY: 'slayer',
+                users.COMBAT_XP_KEY: 'combat',
+                users.GATHER_XP_KEY: 'gather',
+                users.ARTISAN_XP_KEY: 'artisan',
+                users.COOK_XP_KEY: 'cooking',
+                users.QUESTS_KEY: 'quest points',
+                'total': 'total level'
+            }
+            if key not in key_name.keys():
+                await ctx.send(f"Can't make leaderboard with key {key}.")
+                return
+
+            leaderboard = users.get_values_by_account(key=key)
+
+            out = f':hammer_pick: __**{key.upper()} LEADERBOARD**__ :crossed_swords:\n'
             if name is None:
                 try:
                     for i in range(10):
                         user_id, amount = leaderboard[i]
                         amount_formatted = '{:,}'.format(amount)
-                        out += f'**({1 + i}) {ctx.message.guild.get_member(user_id).name}**: G${amount_formatted}\n'
+                        member = ctx.message.guild.get_member(user_id)
+                        if member is not None:
+                            name = get_display_name(member)
+                        else:
+                            name = f'User {user_id}'
+                        out += f'**({1 + i}) {name}**: '
+                        if key == users.ITEMS_KEY:
+                            out += f'{amount_formatted}  coins\n'
+                        elif key == users.QUESTS_KEY:
+                            out += f'{amount_formatted} quests\n'
+                        elif key == 'total':
+                            out += f'{amount_formatted} levels\n'
+                        else:
+                            out += f'{users.xp_to_level(amount)} *({amount_formatted}xp)*\n'
                 except IndexError:
                     pass
                 await ctx.send(out)
@@ -754,7 +836,20 @@ class Miniscape():
                         for i in range(len(leaderboard) - 10, len(leaderboard)):
                             user_id, amount = leaderboard[i]
                             amount_formatted = '{:,}'.format(amount)
-                            out += f'**({1 + i}) {ctx.message.guild.get_member(user_id).name}**: G${amount_formatted}\n'
+                            member = ctx.message.guild.get_member(user_id)
+                            if member is not None:
+                                name = get_display_name(member)
+                            else:
+                                name = f'User {user_id}'
+                            out += f'**({1 + i}) {name}**: '
+                            if key == users.ITEMS_KEY:
+                                out += f'{amount_formatted}  coins\n'
+                            elif key == users.QUESTS_KEY:
+                                out += f'{amount_formatted} quests\n'
+                            elif key == 'total':
+                                out += f'{amount_formatted} levels\n'
+                            else:
+                                out += f'{users.xp_to_level(amount)} *({amount_formatted}xp)*\n'
                     except IndexError:
                         pass
                     await ctx.send(out)
@@ -775,11 +870,24 @@ class Miniscape():
                         for i in range(lower, upper):
                             user_id, amount = leaderboard[i]
                             amount_formatted = '{:,}'.format(amount)
-                            out += f'**({1 + i}) {ctx.message.guild.get_member(user_id).name}**: G${amount_formatted}\n'
+                            member = ctx.message.guild.get_member(user_id)
+                            if member is not None:
+                                name = get_display_name(member)
+                            else:
+                                name = f'User {user_id}'
+                            out += f'**({1 + i}) {name}**: '
+                            if key == users.ITEMS_KEY:
+                                out += f'{amount_formatted}  coins\n'
+                            elif key == users.QUESTS_KEY:
+                                out += f'{amount_formatted} quests\n'
+                            elif key == 'total':
+                                out += f'{amount_formatted} levels\n'
+                            else:
+                                out += f'{users.xp_to_level(amount)} *({amount_formatted}xp)*\n'
                     except IndexError:
                         pass
                     except ValueError:
-                        await ctx.send(f'Error: name {name} not found in leaderboard.')
+                        await ctx.send(f'Name {name} not found in leaderboard.')
                     await ctx.send(out)
 
     async def backup_users(self):

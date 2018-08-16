@@ -52,7 +52,7 @@ def calc_chance(userid, questid):
     monster_combat = get_attr(questid, key=LEVEL_KEY)
     player_combat = users.xp_to_level(users.read_user(userid, key=users.SLAYER_XP_KEY))
     if get_attr(questid, key=DRAGON_KEY):
-        if equipment[7] == '266' or equipment[7] == '293':
+        if equipment['7'] == '266' or equipment['7'] == '293':
             monster_base = 1
         else:
             monster_base = 100
@@ -175,9 +175,9 @@ def print_details(userid, questid):
         out += f'\n**Item Requirements**:\n'
         for itemid in item_reqs:
             if users.item_in_inventory(userid, itemid, item_reqs[itemid]):
-                out += f'~~{item_reqs[itemid]} {items.get_attr(itemid)}~~\n'
+                out += f'~~{items.add_plural(item_reqs[itemid], itemid)}~~\n'
             else:
-                out += f'{item_reqs[itemid]} {items.get_attr(itemid)}\n'
+                out += f'{items.add_plural(item_reqs[itemid], itemid)}\n'
 
     out += f'\nIf you would like to do this quest, type `~quest start {questid}`.'
     return out

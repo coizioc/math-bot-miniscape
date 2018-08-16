@@ -1,4 +1,5 @@
 import math
+import random
 import datetime
 
 from subs.miniscape.files import XP_FACTOR
@@ -154,9 +155,10 @@ def get_kill(userid, monster, length=-1, number=-1):
             length = math.floor(calc_length(userid, monsterid, number)[1] / 60)
         else:
             return 'Error: argument missing (number or kill length).'
+
         grind = adv.format_line(1, userid, adv.get_finish_time(length * 60), monsterid, monster_name, number, length)
         adv.write(grind)
-        out += f'You are now killing {number} {mon.add_plural(monsterid)} for {length} minutes.'
+        out += f'You are now killing {mon.add_plural(number, monsterid)} for {length} minutes. '
     else:
         out = adv.print_adventure(userid)
         out += adv.print_on_adventure_error('kill')
@@ -310,9 +312,9 @@ def get_reaper_result(person, *args):
         out += f'\nYou have received lower loot and experience because you have died.'\
                f'\nYou have received {slayer_xp_formatted} slayer xp and {combat_xp_formatted} combat xp. '
         if cb_level_after > cb_level_before:
-            out += f'In addition, you have gained {cb_level_after - cb_level_before} combat levels. '
+            out += f'Also, you have gained {cb_level_after - cb_level_before} combat levels. '
         if slay_level_after > slay_level_before:
-            out += f'Also, as well, you have gained {slay_level_after - slay_level_before} slayer levels. '
+            out += f'In addition, you have gained {slay_level_after - slay_level_before} slayer levels. '
     return out
 
 
@@ -348,11 +350,18 @@ def get_task(userid):
         else:
             return "Error: gear too low to fight any monsters. Please equip some better gear and try again. " \
                    "If you are new, type `~starter` to get a bronze kit."
+        cb_perk = False
+        if users.read_user(userid, key=users.COMBAT_XP_KEY) == 99 and random.randint(1, 20) == 1:
+            task_length *= 0.7
+            cb_perk = True
+
         monster_name = mon.get_attr(monsterid)
         task = adv.format_line(0, userid, adv.get_finish_time(task_length), monsterid,
                                monster_name, num_to_kill, chance)
         adv.write(task)
         out += print_task(userid)
+        if cb_perk is True:
+            out += 'Your time has been reduced by 30% due to your combat perk!'
     else:
         out = adv.print_adventure(userid)
         out += adv.print_on_adventure_error('task')
@@ -388,11 +397,19 @@ def get_reaper_task(userid):
             return "Error: gear too low to fight any monsters. Please equip some better gear and try again. " \
                    "If you are new, type `~starter` to get a bronze kit."
         monster_name = mon.get_attr(monsterid)
+
+        cb_perk = False
+        if users.read_user(userid, key=users.COMBAT_XP_KEY) == 99 and random.randint(1, 20) == 1:
+            task_length *= 0.7
+            cb_perk = True
+
         task = adv.format_line(5, userid, adv.get_finish_time(task_length), monsterid,
                                monster_name, num_to_kill, chance)
         adv.write(task)
         users.update_user(userid, datetime.date.today(), key=users.LAST_REAPER_KEY)
         out += print_task(userid, reaper=True)
+        if cb_perk is True:
+            out += 'Your time has been reduced by 30% due to your combat perk!'
     else:
         out = adv.print_adventure(userid)
         out += adv.print_on_adventure_error('reaper task')
@@ -407,14 +424,15 @@ def print_loot(loot, person, monster_name, num_to_kill, add_mention=True):
     else:
         out += f'{person.name}, '
     monsterid = mon.find_by_name(monster_name)
-    out += f'Your loot from your {num_to_kill} {mon.add_plural(monsterid)} has arrived!**\n'
+    out += f'Your loot from your {mon.add_plural(num_to_kill, monsterid)} has arrived!**\n'
 
     rares = mon.get_rares(monster_name)
-    for key in loot.keys():
-        if key in rares:
-            out += f'**{loot[key]} {items.get_attr(key)}**\n'
+    for itemid in loot.keys():
+        item_name = items.add_plural(loot[itemid], itemid)
+        if itemid in rares:
+            out += f'**{item_name}**\n'
         else:
-            out += f'{loot[key]} {items.get_attr(key)}\n'
+            out += f'{item_name}\n'
 
     total_value = '{:,}'.format(users.get_value_of_inventory(loot))
     out += f'*Total value: {total_value}*'
@@ -454,7 +472,7 @@ def print_chance(userid, monsterid, monster_dam=-1, monster_acc=-1, monster_arm=
 def print_kill_status(time_left, *args):
     monsterid, monster_name, number, length = args[0]
     out = f'{SLAYER_HEADER}' \
-          f'You are currently killing {number} {mon.add_plural(monsterid)} for {length} minutes. ' \
+          f'You are currently killing {mon.add_plural(number, monsterid)} for {length} minutes. ' \
           f'You can see your loot {time_left}.'
     return out
 
@@ -462,7 +480,7 @@ def print_kill_status(time_left, *args):
 def print_status(time_left, *args):
     monsterid, monster_name, num_to_kill, chance = args[0]
     out = f'{SLAYER_HEADER}' \
-          f'You are currently slaying {num_to_kill} {mon.add_plural(monsterid)}. ' \
+          f'You are currently slaying {mon.add_plural(num_to_kill, monsterid)}. ' \
           f'You can see the results of this slayer task {time_left}. ' \
           f'You currently have a {chance}% chance of succeeding with your current gear. '
     return out
@@ -471,7 +489,7 @@ def print_status(time_left, *args):
 def print_reaper_status(time_left, *args):
     monsterid, monster_name, num_to_kill, chance = args[0]
     out = f'{SLAYER_HEADER}' \
-          f'You are currently on a reaper task of {num_to_kill} {mon.add_plural(monsterid)}. ' \
+          f'You are currently on a reaper task of {mon.add_plural(num_to_kill, monsterid)}. ' \
           f'You can see the results of this slayer task {time_left}. ' \
           f'You currently have a {chance}% chance of succeeding with your current gear. '
     return out
@@ -484,7 +502,7 @@ def print_task(userid, reaper=False):
         out = f'New reaper task received: '
     else:
         out = f'New slayer task received: '
-    out += f'Kill __{num_to_kill} {mon.add_plural(monsterid)}__!\n'
+    out += f'Kill __{mon.add_plural(num_to_kill, monsterid)}__!\n'
     out += f'This will take {task_length} minutes '
     out += f'and has a success rate of {chance}% with your current gear. '
     return out

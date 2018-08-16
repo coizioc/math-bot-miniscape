@@ -30,6 +30,7 @@ COMBAT_XP_KEY = 'combat'        # User's combat xp, stored as an int.
 SLAYER_XP_KEY = 'slayer'        # User's slayer xp, stored as an int.
 GATHER_XP_KEY = 'gather'        # User's gathering xp, stored as an int.
 ARTISAN_XP_KEY = 'artisan'      # User's artisan xp, stored as an int.
+COOK_XP_KEY = 'cook'            # User's cooking xp, stored as an int.
 LAST_REAPER_KEY = 'reaper'      # Date of user's last reaper task, stored as a date object.
 POTION_KEY = 'potion'           # User's active potion, stored as an int.
 QUESTS_KEY = 'quests'           # User's completed quests. Stored as a hexadecimal number whose bits represent
@@ -43,6 +44,7 @@ DEFAULT_ACCOUNT = {IRONMAN_KEY: False,
                    SLAYER_XP_KEY: 0,
                    GATHER_XP_KEY: 0,
                    ARTISAN_XP_KEY: 0,
+                   COOK_XP_KEY: 0,
                    LAST_REAPER_KEY: datetime.date.today() - datetime.timedelta(days=1),
                    QUESTS_KEY: "0x0"}   # What's this?
 
@@ -145,8 +147,45 @@ def unequip_item(userid, item):
 
 
 def get_coins_in_inventory(userid):
-    return
-    # TODO finish this method.
+    """Gets the number of coins in a user's inventory."""
+    inventory = read_user(userid, key=ITEMS_KEY)
+    try:
+        coins = int(inventory['0'])
+    except KeyError:
+        coins = 0
+    return coins
+
+
+def get_total_level(userid):
+    """Gets the total level of a user."""
+    combat_level = get_level(userid, key=COMBAT_XP_KEY)
+    slayer_level = get_level(userid, key=SLAYER_XP_KEY)
+    gather_level = get_level(userid, key=GATHER_XP_KEY)
+    artisan_level = get_level(userid, key=ARTISAN_XP_KEY)
+    cooking_level = get_level(userid, key=COOK_XP_KEY)
+    total_level = combat_level + slayer_level + gather_level + artisan_level + cooking_level
+    return total_level
+
+
+def get_values_by_account(key=ITEMS_KEY):
+    """Gets a certain value from all user's accounts and sorts them in descending order."""
+    leaderboard = []
+    for userfile in os.listdir(f'{USER_DIRECTORY}'):
+        userid = userfile[:-5]
+
+        if key == ITEMS_KEY:
+            value = get_coins_in_inventory(userid)
+        elif key == QUESTS_KEY:
+            value = len(get_completed_quests(userid))
+        elif key == 'total':
+            value = get_total_level(userid)
+        else:
+            value = read_user(userid, key=key)
+
+        if value > 0:
+            leaderboard.append((int(userid), int(value)))
+    return sorted(leaderboard, key=lambda x: x[1], reverse=True)
+
 
 def get_completed_quests(userid):
     hex_number = int(str(read_user(userid, key=QUESTS_KEY))[2:], 16)
@@ -241,17 +280,26 @@ def print_account(userid, nickname, printequipment=True):
     slayer_xp = read_user(userid, key=SLAYER_XP_KEY)
     gather_xp = read_user(userid, key=GATHER_XP_KEY)
     artisan_xp = read_user(userid, key=ARTISAN_XP_KEY)
+    cooking_xp = read_user(userid, key=COOK_XP_KEY)
+    combat_xp_formatted = '{:,}'.format(combat_xp)
+    slayer_xp_formatted = '{:,}'.format(slayer_xp)
+    gather_xp_formatted = '{:,}'.format(gather_xp)
+    artisan_xp_formatted = '{:,}'.format(artisan_xp)
+    cooking_xp_formatted = '{:,}'.format(cooking_xp)
+
     combat_level = xp_to_level(combat_xp)
     slayer_level = xp_to_level(slayer_xp)
     gather_level = xp_to_level(gather_xp)
     artisan_level = xp_to_level(artisan_xp)
-    total = combat_level + slayer_level + gather_level + artisan_level
+    cooking_level = xp_to_level(cooking_xp)
+    total = get_total_level(userid)
     out = f"{CHARACTER_HEADER.replace('$NAME', nickname.upper())}"\
-          f'**Combat Level**: {combat_level} *({combat_xp} xp)*\n'\
-          f'**Slayer Level**: {slayer_level} *({slayer_xp} xp)*\n' \
-          f'**Gathering Level**: {gather_level} *({gather_xp} xp)*\n' \
-          f'**Artisan Level**: {artisan_level} *({artisan_xp} xp)*\n'\
-          f'**Skill Total**: {total}/{4 * 99}\n\n'\
+          f'**Combat Level**: {combat_level} *({combat_xp_formatted} xp)*\n'\
+          f'**Slayer Level**: {slayer_level} *({slayer_xp_formatted} xp)*\n' \
+          f'**Gathering Level**: {gather_level} *({gather_xp_formatted} xp)*\n' \
+          f'**Artisan Level**: {artisan_level} *({artisan_xp_formatted} xp)*\n' \
+          f'**Cooking Level**: {cooking_level} *({cooking_xp_formatted} xp)*\n' \
+          f'**Skill Total**: {total}/{5 * 99}\n\n'\
           f'**Quests Completed**: {len(get_completed_quests(userid))}/{len(quests.QUESTS.keys())}\n\n'
 
     if printequipment:
@@ -293,8 +341,12 @@ def print_inventory(person, search):
     header = f":moneybag: __**{name.upper()}'S INVENTORY**__ :moneybag:\n"
     messages = []
     out = header
-    for itemid in list(inventory.keys()):
-        name = items.get_attr(itemid)
+
+    sorted_items = []
+    for itemid in inventory.keys():
+        sorted_items.append((items.get_attr(itemid), itemid))
+    for name, itemid in sorted(sorted_items, key=lambda tup: tup[0]):
+        # name = items.get_attr(itemid)
         if search != '':
             if search not in name.lower():
                 continue
@@ -374,7 +426,7 @@ def update_user(userid, value, key=ITEMS_KEY):
     except FileNotFoundError:
         userjson = DEFAULT_ACCOUNT
 
-    if key == COMBAT_XP_KEY or key == SLAYER_XP_KEY or key == GATHER_XP_KEY or key == ARTISAN_XP_KEY:
+    if key in {COMBAT_XP_KEY, SLAYER_XP_KEY, GATHER_XP_KEY, ARTISAN_XP_KEY, COOK_XP_KEY}:
         current_xp = userjson[key]
         userjson[key] = current_xp + value
     elif key == QUESTS_KEY:

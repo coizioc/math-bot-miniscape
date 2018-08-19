@@ -13,6 +13,7 @@ with open(ITEM_JSON, 'r', encoding='utf-8-sig') as f:
 
 NAME_KEY = 'name'           # Name of the item
 PLURAL_KEY = 'plural'       # string containing how to pluralise an item's name.
+NICK_KEY = 'nick'           # list of nicknames for an item.
 VALUE_KEY = 'value'         # High alch value of the item
 DAMAGE_KEY = 'damage'       # Damage stat of the item
 ACCURACY_KEY = 'accuracy'   # Accuracy stat of the item
@@ -32,6 +33,7 @@ EAT_KEY = 'eat'             # Int representing chance improvement by item when s
 LUCK_KEY = 'luck'           # float representing factor of luck enhancement
 DEFAULT_ITEM = {NAME_KEY: 'unknown item',
                 PLURAL_KEY: 's',
+                NICK_KEY: [],
                 VALUE_KEY: 0,
                 DAMAGE_KEY: 0,
                 ACCURACY_KEY: 0,
@@ -54,7 +56,7 @@ DEFAULT_ITEM = {NAME_KEY: 'unknown item',
 SHOP_HEADER = '__**:moneybag: SHOP :moneybag:**__\n'
 
 
-def add_plural(number, itemid):
+def add_plural(number, itemid, with_zero=False):
     if int(number) > 0:
         out = f'{number} {get_attr(itemid)}'
     else:
@@ -184,10 +186,15 @@ def drink(userid, name):
 
 
 def find_by_name(name):
-    """Finds an item's ID from its name."""
-    for item in list(ITEMS.keys()):
-        if name.lower() == ITEMS[item][NAME_KEY]:
-            return item
+    """Finds a item's ID from its name."""
+    name = name.lower()
+    for itemid in list(ITEMS.keys()):
+        if name == ITEMS[itemid][NAME_KEY]:
+            return itemid
+        if name == add_plural(0, itemid):
+            return itemid
+        if any([name == nick for nick in get_attr(itemid, key=NICK_KEY)]):
+            return itemid
     else:
         raise KeyError
 
@@ -287,6 +294,7 @@ def print_stats(item):
 
     name = get_attr(itemid).title()
     value = '{:,}'.format(get_attr(itemid, key=VALUE_KEY))
+    aliases = ', '.join(get_attr(itemid, key=NICK_KEY))
     damage = get_attr(itemid, key=DAMAGE_KEY)
     accuracy = get_attr(itemid, key=ACCURACY_KEY)
     armour = get_attr(itemid, key=ARMOUR_KEY)
@@ -295,13 +303,19 @@ def print_stats(item):
 
     out = f'__**:moneybag: ITEMS :moneybag:**__\n'
     out += f'**Name**: {name}\n'
+    if len(aliases) > 0:
+        out += f'**Aliases**: {aliases}\n'
     out += f'**Value**: {value} gp\n'
     if slot > 0:
         out += f'**Damage**: {damage}\n'
         out += f'**Accuracy**: {accuracy}\n'
         out += f'**Armour**: {armour}\n'
         out += f'**Slot**: {users.SLOTS[str(slot)].title()}\n'
-        out += f'**Level Requirement**: {level}\n'
+        out += f'**Combat Requirement**: {level}\n'
+    if get_attr(itemid, key=GATHER_KEY):
+        xp = get_attr(itemid, key=XP_KEY)
+        out += f'**Gather Requirement**: {level}\n'
+        out += f'**xp**: {xp}\n'
 
     out += "\n" + mon.print_item_from_lootable(itemid)
     out += clues.print_item_from_lootable(itemid)

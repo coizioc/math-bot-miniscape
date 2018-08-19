@@ -14,4 +14,4 @@ SKILLS_FILE = f'{RESOURCES_DIRECTORY}skills.txt'
 ADVENTURES_FILE = f'{RESOURCES_DIRECTORY}current_adventures.txt'
 SHOP_FILE = f'{RESOURCES_DIRECTORY}shop.txt'
 CREATOR_ID = 293219528450637824
-XP_FACTOR = 2   # Edit for DXP shenanigans
+XP_FACTOR = 1   # Edit for DXP shenanigans

@@ -27,7 +27,7 @@ def calc_length(userid, difficulty):
     """Calculates the time it takes to do a clue scroll."""
     quests_completed = len(users.get_completed_quests(userid))
     num_of_quests = len(list(quests.QUESTS.keys()))
-    player_damage = users.get_equipment_stats(users.read_user(userid, key=users.EQUIPMENT_KEY))[0]
+    player_damage = users.get_equipment_stats(users.read_user(userid, key=users.EQUIPMENT_KEY))[0] + 1
 
     quest_multiplier = min((6 - difficulty) * quests_completed / num_of_quests, 1)
 
@@ -147,7 +147,7 @@ def print_loot(loot, difficulty):
         else:
             out += f'{loot[key]} {items.get_attr(key)}\n'
 
-    total_value = '{:,}'.format(users.get_value_of_inventory(loot))
+    total_value = '{:,}'.format(users.get_value_of_inventory(1234567890, inventory=loot))
     out += f'*Total value: {total_value}*'
 
     return out

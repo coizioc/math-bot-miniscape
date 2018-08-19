@@ -55,8 +55,8 @@ RARITY_NAMES = {
     }
 
 
-def add_plural(number, monsterid):
-    if int(number) > 0:
+def add_plural(number, monsterid, with_zero=False):
+    if int(number) > 0 or with_zero:
         out = f'{number} {get_attr(monsterid)}'
     else:
         out = f'{get_attr(monsterid)}'
@@ -233,7 +233,10 @@ def print_monster(monster):
           f'**Name**: {MONSTERS[monsterid][NAME_KEY].title()}\n'
 
     if len(aliases) > 0:
-        out += f'**Aliases**: {aliases}\n'\
+        out += f'**Aliases**: {aliases}\n'
+    slayer_req = get_attr(monsterid, key=SLAYER_REQ_KEY)
+    if slayer_req > 1:
+        out += f'**Slayer Requirement**: {slayer_req}\n'
 
     out += f'**Level**: {MONSTERS[monsterid][LEVEL_KEY]}\n'\
            f'**Accuracy**: {MONSTERS[monsterid][ACCURACY_KEY]}\n'\

@@ -23,6 +23,7 @@ with open(ARMOUR_SLOTS_FILE, 'r') as f:
 
 IRONMAN_KEY = 'ironman'         # User's ironman status, stored as a boolean.
 ITEMS_KEY = 'items'             # User's inventory, stored as a Counter.
+LOCKED_ITEMS_KEY = 'locked'     # Items locked in user's inventory, stored as a list of itemids.
 MONSTERS_KEY = 'monsters'       # Count of monsters user has killed, stored as a Counter.
 CLUES_KEY = 'clues'             # Count of clues user has completed, stored as a Counter.
 EQUIPMENT_KEY = 'equip'         # User's equipment, stored as a dicr.
@@ -37,6 +38,7 @@ QUESTS_KEY = 'quests'           # User's completed quests. Stored as a hexadecim
                                 # whether a user has completed a quest with that questid.
 DEFAULT_ACCOUNT = {IRONMAN_KEY: False,
                    ITEMS_KEY: Counter(),
+                   LOCKED_ITEMS_KEY: ["0"],
                    MONSTERS_KEY: Counter(),
                    CLUES_KEY: Counter(),
                    EQUIPMENT_KEY: dict(zip(range(1, 16), 15*[-1])),
@@ -82,10 +84,11 @@ def clear_inventory(userid, under=None):
         max_sell = int(under)
     else:
         max_sell = 2147483647
-    inventory = read_user(userid, ITEMS_KEY)
-    for itemid in list(inventory.keys()):
+    inventory = read_user(userid)
+    locked_items = read_user(userid, key=LOCKED_ITEMS_KEY)
+    for itemid in inventory.keys():
         value = items.get_attr(itemid, key=items.VALUE_KEY)
-        if inventory[itemid] > 0 and 0 < value < max_sell:
+        if inventory[itemid] > 0 and 0 < value < max_sell and itemid not in locked_items:
             inventory[itemid] = 0
     update_user(userid, inventory, key=ITEMS_KEY)
 
@@ -218,17 +221,22 @@ def get_level(userid, key):
     return xp_to_level(xp)
 
 
-def get_value_of_inventory(inventory, under=None):
+def get_value_of_inventory(userid, inventory=None, under=None, add_locked=False):
     """Gets the total value of a user's inventory."""
+    if inventory is None:
+        inventory = read_user(userid)
     if under is not None:
         max_value = int(under)
     else:
         max_value = 999999999999
+
     total_value = 0
+    locked_items = set(read_user(userid, key=LOCKED_ITEMS_KEY))
     for item in list(inventory.keys()):
         value = items.get_attr(item, key=items.VALUE_KEY)
         if value < max_value:
-            total_value += int(inventory[item]) * value
+            if item not in locked_items or add_locked:
+                total_value += int(inventory[item]) * value
     return total_value
 
 
@@ -245,6 +253,40 @@ def item_in_inventory(userid, item, number=1):
             return False
     except KeyError:
         return False
+
+
+def lock_item(userid, item):
+    """Locks an item from being sold accidentally."""
+    try:
+        itemid = items.find_by_name(item)
+    except KeyError:
+        return f'No item with name {item} found.'
+
+    item_name = items.get_attr(itemid)
+    locked_items = read_user(userid, key=LOCKED_ITEMS_KEY)
+    if itemid in locked_items:
+        return f'{item_name} is already locked.'
+    locked_items.append(itemid)
+    update_user(userid, locked_items, key=LOCKED_ITEMS_KEY)
+
+    return f'{item_name} has been locked!'
+
+
+def unlock_item(userid, item):
+    """Unlocks an item, allowing it to be sold again."""
+    try:
+        itemid = items.find_by_name(item)
+    except KeyError:
+        return f'No item with name {item} found.'
+
+    item_name = items.get_attr(itemid)
+    locked_items = read_user(userid, key=LOCKED_ITEMS_KEY)
+    if itemid not in locked_items:
+        return f'{item_name} is already unlocked.'
+    locked_items.remove(itemid)
+    update_user(userid, locked_items, key=LOCKED_ITEMS_KEY)
+
+    return f'{item_name} has been unlocked!'
 
 
 def parse_int(number_as_string):
@@ -342,6 +384,7 @@ def print_inventory(person, search):
     messages = []
     out = header
 
+    locked_items = read_user(person.id, key=LOCKED_ITEMS_KEY)
     sorted_items = []
     for itemid in inventory.keys():
         sorted_items.append((items.get_attr(itemid), itemid))
@@ -355,12 +398,14 @@ def print_inventory(person, search):
         item_total_value = int(inventory[itemid]) * value
         item_total_value_formatted = '{:,}'.format(item_total_value)
         if inventory[itemid] > 0:
-            out += f'**{items.get_attr(itemid).title()}**: {inventory[itemid]}. ' \
-                   f'*(value: {item_total_value_formatted}, {value_formatted} ea.)*\n'
+            out += f'**{items.get_attr(itemid).title()} '
+            if itemid in locked_items:
+                out += f'(:lock:)'
+            out += f'**: {inventory[itemid]}. *(value: {item_total_value_formatted}, {value_formatted} ea.)*\n'
         if len(out) > 1800:
             messages.append(out)
             out = header
-    total_value = '{:,}'.format(get_value_of_inventory(inventory))
+    total_value = '{:,}'.format(get_value_of_inventory(person.id, add_locked=True))
     out += f'*Total value: {total_value}*\n'
     messages.append(out)
     return messages

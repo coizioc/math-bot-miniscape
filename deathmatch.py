@@ -1,7 +1,7 @@
 """Implements methods related to the deathmatch commands of mathbot.subs.gastercoin."""
 import random
 
-DEATHMATCH_FILE = './subs/gastercoin/resources/deathmatch.txt'
+DEATHMATCH_FILE = './subs/miniscape/resources/deathmatch.txt'
 
 DEATHMATCH_HEADER = '__**:anger:DEATHMATCH:anger:**__'
 

@@ -158,7 +158,7 @@ def get_kill(userid, monster, length=-1, number=-1):
 
         grind = adv.format_line(1, userid, adv.get_finish_time(length * 60), monsterid, monster_name, number, length)
         adv.write(grind)
-        out += f'You are now killing {mon.add_plural(number, monsterid)} for {length} minutes. '
+        out += f'You are now killing {mon.add_plural(number, monsterid, with_zero=True)} for {length} minutes. '
     else:
         out = adv.print_adventure(userid)
         out += adv.print_on_adventure_error('kill')
@@ -209,7 +209,6 @@ def get_result(person, *args):
     out = ''
     users.add_counter(person.id, monsterid, num_to_kill)
     if adv.is_success(calc_chance(person.id, monsterid, num_to_kill)):
-
         users.remove_potion(person.id)
         loot = mon.get_loot(monsterid, int(num_to_kill), factor=items.get_luck_factor(person.id))
         users.update_inventory(person.id, loot)
@@ -254,7 +253,6 @@ def get_result(person, *args):
             out += f'In addition, you have gained {cb_level_after - cb_level_before} combat levels. '
         if slay_level_after > slay_level_before:
             out += f'Also, as well, you have gained {slay_level_after - slay_level_before} slayer levels. '
-
     return out
 
 
@@ -424,7 +422,7 @@ def print_loot(loot, person, monster_name, num_to_kill, add_mention=True):
     else:
         out += f'{person.name}, '
     monsterid = mon.find_by_name(monster_name)
-    out += f'Your loot from your {mon.add_plural(num_to_kill, monsterid)} has arrived!**\n'
+    out += f'Your loot from your {mon.add_plural(num_to_kill, monsterid, with_zero=True)} has arrived!**\n'
 
     rares = mon.get_rares(monster_name)
     for itemid in loot.keys():
@@ -433,8 +431,7 @@ def print_loot(loot, person, monster_name, num_to_kill, add_mention=True):
             out += f'**{item_name}**\n'
         else:
             out += f'{item_name}\n'
-
-    total_value = '{:,}'.format(users.get_value_of_inventory(loot))
+    total_value = '{:,}'.format(users.get_value_of_inventory(person.id, inventory=loot))
     out += f'*Total value: {total_value}*'
 
     return out
@@ -472,7 +469,7 @@ def print_chance(userid, monsterid, monster_dam=-1, monster_acc=-1, monster_arm=
 def print_kill_status(time_left, *args):
     monsterid, monster_name, number, length = args[0]
     out = f'{SLAYER_HEADER}' \
-          f'You are currently killing {mon.add_plural(number, monsterid)} for {length} minutes. ' \
+          f'You are currently killing {mon.add_plural(number, monsterid, with_zero=True)} for {length} minutes. ' \
           f'You can see your loot {time_left}.'
     return out
 
@@ -480,7 +477,7 @@ def print_kill_status(time_left, *args):
 def print_status(time_left, *args):
     monsterid, monster_name, num_to_kill, chance = args[0]
     out = f'{SLAYER_HEADER}' \
-          f'You are currently slaying {mon.add_plural(num_to_kill, monsterid)}. ' \
+          f'You are currently slaying {mon.add_plural(num_to_kill, monsterid, with_zero=True)}. ' \
           f'You can see the results of this slayer task {time_left}. ' \
           f'You currently have a {chance}% chance of succeeding with your current gear. '
     return out
@@ -489,7 +486,7 @@ def print_status(time_left, *args):
 def print_reaper_status(time_left, *args):
     monsterid, monster_name, num_to_kill, chance = args[0]
     out = f'{SLAYER_HEADER}' \
-          f'You are currently on a reaper task of {mon.add_plural(num_to_kill, monsterid)}. ' \
+          f'You are currently on a reaper task of {mon.add_plural(num_to_kill, monsterid, with_zero=True)}. ' \
           f'You can see the results of this slayer task {time_left}. ' \
           f'You currently have a {chance}% chance of succeeding with your current gear. '
     return out
@@ -502,7 +499,7 @@ def print_task(userid, reaper=False):
         out = f'New reaper task received: '
     else:
         out = f'New slayer task received: '
-    out += f'Kill __{mon.add_plural(num_to_kill, monsterid)}__!\n'
+    out += f'Kill __{mon.add_plural(num_to_kill, monsterid, with_zero=True)}__!\n'
     out += f'This will take {task_length} minutes '
     out += f'and has a success rate of {chance}% with your current gear. '
     return out

@@ -186,15 +186,20 @@ def print_details(userid, questid):
 def print_list(userid):
     """Lists quests a user can do at the moment."""
     out = f'{QUEST_HEADER}'
+    messages = []
     for questid in list(QUESTS.keys()):
         if has_quest_reqs(userid, questid):
             if int(questid) in set(users.get_completed_quests(userid)):
                 out += f'~~**{questid}**. {get_attr(questid)}~~\n'
             else:
                 out += f'**{questid}**. {get_attr(questid)}\n'
+            if len(out) > 1800:
+                messages.append(out)
+                out = f'{QUEST_HEADER}'
     out += f'\n**Quests Completed**: {len(users.get_completed_quests(userid))}/{len(QUESTS.keys())}\n'
     out += 'Type `~quest [quest number]` to see more information about a quest.'
-    return out
+    messages.append(out)
+    return messages
 
 
 def print_quest(questid, time, chance):

@@ -25,6 +25,7 @@ DEFAULT_RECIPE = {
     INPUTS_KEY: Counter()
 }
 
+
 def cook(userid, food, n=1):
     """Cooks (a given number of) an item."""
     try:
@@ -103,10 +104,12 @@ def craft(userid, recipe, n=1):
         for _ in range(n):
             if random.randint(1, 20) == 1:
                 bonus += 1
+    equipment = users.read_user(userid, users.EQUIPMENT_KEY)
+    goldsmith_bonus = 2 if equipment['9'] == '494' and recipeid == '59' else 1
 
     users.update_inventory(userid, recipe_input, remove=True)
     users.update_inventory(userid, (n + bonus) * [recipeid])
-    xp = XP_FACTOR * n * items.get_attr(recipeid, key=items.XP_KEY)
+    xp = XP_FACTOR * goldsmith_bonus * n * items.get_attr(recipeid, key=items.XP_KEY)
     users.update_user(userid, xp, key=users.ARTISAN_XP_KEY)
     level_after = users.xp_to_level(users.read_user(userid, users.ARTISAN_XP_KEY))
 
@@ -123,8 +126,10 @@ def calc_burn(userid, itemid):
     """Calculates the burn chance for a given food."""
     cook_level = users.read_user(userid, key=users.COOK_XP_KEY)
     cook_req = items.get_attr(itemid, key=items.COOK_KEY)
+    equipment = users.read_user(userid, key=users.EQUIPMENT_KEY)
+    c = 10 if equipment['9'] == '493' else 0
 
-    chance = max(100 * ((cook_level - cook_req) / 20), 20)
+    chance = max(100 * ((cook_level - cook_req + c) / 20), 20)
     return 100 - min(100, chance)
 
 
@@ -224,9 +229,9 @@ def get_gather(person, *args):
     return out
 
 
-def print_list(userid):
+def print_list(userid, search):
     """Prints a list of the recipes a user can use."""
-    completed_quests = set(users.get_completed_quests(userid))
+    # completed_quests = set(users.get_completed_quests(userid))
     messages = []
     out = f'{CRAFT_HEADER}'
     recipe_list = []
@@ -235,10 +240,11 @@ def print_list(userid):
         level = get_attr(itemid, key=ARTISAN_REQ_KEY)
         recipe_list.append((level, name))
     for recipe in sorted(recipe_list):
-        out += f'**{recipe[1].title()}** *(level {recipe[0]})*\n'
-        if len(out) > 1800:
-            messages.append(out)
-            out = f'{CRAFT_HEADER}'
+        if search in recipe[1]:
+            out += f'**{recipe[1].title()}** *(level {recipe[0]})*\n'
+            if len(out) > 1800:
+                messages.append(out)
+                out = f'{CRAFT_HEADER}'
     out += 'Type `~recipes info [item]` to get more info about how to craft a particular item.'
     messages.append(out)
     return messages

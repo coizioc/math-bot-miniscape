@@ -32,7 +32,8 @@ DUEL_CHANNEL = 479056789330067457
 JEOPARDY_CHANNEL = 479694071191961617
 MINISCAPE_1_CHANNEL = 479668572344287238
 MINISCAPE_2_CHANNEL = 479663988154695684
-GENERAL_CHANNELS = [MINISCAPE_1_CHANNEL, MINISCAPE_2_CHANNEL]
+TEST_CHANNEL = 408424622648721410
+GENERAL_CHANNELS = [MINISCAPE_1_CHANNEL, MINISCAPE_2_CHANNEL, TEST_CHANNEL]
 
 
 class AmbiguousInputError(Exception):
@@ -112,6 +113,83 @@ class Miniscape():
             await ctx.send(f"{name.title()}, you were spared by Thanos.")
         else:
             await ctx.send(f'{name.title()}, you were slain by Thanos, for the good of the Universe.')
+
+    @commands.command()
+    async def ship(self, ctx, *args):
+        """Ships two users together to determine their relationship."""
+        if len(args) == 1:
+            person1 = ctx.author.name.lower().replace(' ', '')
+            person2 = args[0].lower().replace(' ', '')
+        elif len(args) == 2:
+            person1 = args[0].lower().replace(' ', '')
+            person2 = args[1].lower().replace(' ', '')
+        else:
+            return
+        total = 0
+
+        for name in [person1, person2]:
+            for c in name:
+                total += ord(c)
+        percent = (total + 32) % 101
+        out = f':heartpulse: __**MATCHMAKING**__ :heartpulse:\n' \
+              f':small_red_triangle_down: *`{person1}`*\n' \
+              f':small_red_triangle: *`{person2}`*\n\n' \
+              f'**{percent}%** ​`'
+
+        percent_bars = int(math.floor(percent / 10))
+        for _ in range(percent_bars):
+            out += '█'
+        for _ in range(10 - percent_bars):
+            out += ' ​'
+        out += '`\n\n'
+
+        descriptions = {
+            9: 'Awful :sob:',
+            19: 'Bad :cry:',
+            29: 'Pretty low :frowning:',
+            39: 'Not Too Great :confused:',
+            49: 'Worse Than Average :neutral_face:',
+            59: 'Barely :no_mouth:',
+            68: 'Not Bad :slight_smile:',
+            69: '( ͡° ͜ʖ ͡°)',
+            79: 'Pretty Good :smiley:',
+            89: 'Great :smile:',
+            99: 'Amazing :heart_eyes:',
+            100: 'PERFECT! :heart_exclamation:'
+        }
+
+        for max_value in descriptions.keys():
+            if percent <= max_value:
+                description_text = descriptions[max_value]
+                break
+        else:
+            description_text = descriptions[100]
+        out += description_text
+        await ctx.send(out)
+
+    @commands.command()
+    async def shipall(self, ctx, word, bottom=None):
+        """Compares a term against all users in the server."""
+        out = ':heartpulse: __**MATCHMAKING**__ :heartpulse:\n'
+        word = word.lower().replace(' ', '')
+        relationships = []
+        guild_members = ctx.guild.members
+        for member in guild_members:
+            name = member.name.lower().replace(' ', '')
+            total = 0
+
+            for name in [word, name]:
+                for c in name:
+                    total += ord(c)
+            percent = (total + 32) % 101
+            relationships.append(tuple((percent, member)))
+        if bottom is None:
+            relationships = sorted(relationships, key=lambda x: x[0], reverse=True)
+        else:
+            relationships = sorted(relationships, key=lambda x: x[0])
+        for i in range(10):
+            out += f'**{i + 1}**: `{word}` :heart: `{relationships[i][1].name}`: {relationships[i][0]}%\n'
+        await ctx.send(out)
 
     @commands.group(invoke_without_command=True)
     async def me(self, ctx):
@@ -196,9 +274,23 @@ class Miniscape():
 
     @items.command(name='info')
     async def _item_info(self, ctx, *args):
-        item = ' '.join(args)
         if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
+            item = ' '.join(args)
             out = items.print_stats(item)
+            await ctx.send(out)
+
+    @items.command(name='lock')
+    async def _item_lock(self, ctx, *args):
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
+            item = ' '.join(args)
+            out = users.lock_item(ctx.author.id, item)
+            await ctx.send(out)
+
+    @items.command(name='unlock')
+    async def _item_unlock(self, ctx, *args):
+        if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
+            item = ' '.join(args)
+            out = users.unlock_item(ctx.author.id, item)
             await ctx.send(out)
 
     @commands.command()
@@ -421,21 +513,21 @@ class Miniscape():
     async def sellall(self, ctx, maxvalue=None):
         """Sells all items in the player's inventory (below a certain value) for GasterCoin."""
         if ctx.channel.id == SHOP_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
-            inventory = users.read_user(ctx.author.id, key=users.ITEMS_KEY)
+
             name = get_display_name(ctx.author)
-            if maxvalue is None:
-                value = users.get_value_of_inventory(inventory)
+            if maxvalue is not None:
+                value = users.get_value_of_inventory(ctx.author.id, under=maxvalue)
                 users.update_inventory(ctx.author.id, value*["0"])
-                users.clear_inventory(ctx.author.id)
+                users.clear_inventory(ctx.author.id, under=maxvalue)
                 value_formatted = '{:,}'.format(value)
                 maxvalue_formatted = '{:,}'.format(int(maxvalue))
                 name = get_display_name(ctx.author)
                 out = f"All items in {name}'s inventory worth under {maxvalue_formatted} coins "\
                       f"sold for {value_formatted} coins!"
             else:
-                value = users.get_value_of_inventory(inventory, under=maxvalue)
+                value = users.get_value_of_inventory(ctx.author.id)
                 users.update_inventory(ctx.author.id, value * ["0"])
-                users.clear_inventory(ctx.author.id, under=maxvalue)
+                users.clear_inventory(ctx.author.id)
                 value_formatted = '{:,}'.format(value)
                 out = f"All items in {name}'s inventory "\
                       f"sold for {value_formatted} coins!"
@@ -553,9 +645,12 @@ class Miniscape():
         if ctx.channel.id == ADVENTURES_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
             if questid is not None:
                 out = quests.print_details(ctx.author.id, questid)
+                await ctx.send(out)
             else:
-                out = quests.print_list(ctx.author.id)
-            await ctx.send(out)
+                messages = quests.print_list(ctx.author.id)
+                for message in messages:
+                    await ctx.send(message)
+
 
     @quests.command(name='start')
     async def _start(self, ctx, questid):
@@ -588,10 +683,11 @@ class Miniscape():
             await ctx.send(out)
 
     @commands.group(invoke_without_command=True, aliases=['recipe'])
-    async def recipes(self, ctx):
+    async def recipes(self, ctx, *args):
         """Prints a list of recipes a user can create."""
         if ctx.channel.id == BANK_CHANNEL or ctx.channel.id in GENERAL_CHANNELS:
-            messages = craft.print_list(ctx.author.id)
+            search = ' '.join(args)
+            messages = craft.print_list(ctx.author.id, search)
             for message in messages:
                 await ctx.send(message)
 
@@ -684,6 +780,9 @@ class Miniscape():
                     return
                 except AmbiguousInputError as members:
                     await ctx.send(f'Input {opponent} can refer to multiple people ({members})')
+                    return
+                if opponent_member.id == ctx.author.id:
+                    await ctx.send('You cannot fight yourself.')
                     return
                 if users.read_user(opponent_member.id, key=users.IRONMAN_KEY):
                     await ctx.send('You cannot start a staked deathmatch with an ironman.')
